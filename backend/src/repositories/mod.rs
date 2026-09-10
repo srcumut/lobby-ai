@@ -1,0 +1,7 @@
+pub mod lobby_repository;
+pub mod message_repository;
+pub mod moderation_repository;
+pub mod notification_repository;
+pub mod reaction_repository;
+pub mod request_repository;
+pub mod user_repository;
