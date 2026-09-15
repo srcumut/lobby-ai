@@ -26,6 +26,26 @@ pub async fn update_profile(
         display_name: user.display_name,
         avatar_url: user.avatar_url,
         bio: user.bio,
+        is_bot: user.is_bot,
+        created_at: user.created_at,
+    })
+}
+
+pub async fn get_public_profile(
+    state: &SharedState,
+    user_id: Uuid,
+) -> Result<crate::schemas::auth::PublicUserProfile, AppError> {
+    let user = user_repository::find_by_id(&state.db, user_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+
+    Ok(crate::schemas::auth::PublicUserProfile {
+        id: user.id,
+        username: user.username,
+        display_name: user.display_name,
+        avatar_url: user.avatar_url,
+        bio: user.bio,
+        is_bot: user.is_bot,
         created_at: user.created_at,
     })
 }

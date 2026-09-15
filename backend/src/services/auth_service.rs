@@ -51,7 +51,7 @@ pub async fn login(state: &SharedState, request: LoginRequest) -> Result<AuthRes
         .ok_or_else(|| AppError::Unauthorized("Invalid email or password".to_string()))?;
 
     let valid = password::verify_password(&request.password, &user.password_hash)?;
-    if !valid {
+    if !valid || user.is_bot {
         return Err(AppError::Unauthorized(
             "Invalid email or password".to_string(),
         ));
@@ -73,6 +73,10 @@ pub async fn refresh(
     let user = user_repository::find_by_id(&state.db, claims.sub)
         .await?
         .ok_or_else(|| AppError::Unauthorized("User not found".to_string()))?;
+
+    if user.is_bot {
+        return Err(AppError::Unauthorized("User not found".to_string()));
+    }
 
     build_auth_response(
         &state.config.jwt_access_secret,
@@ -99,6 +103,7 @@ fn build_auth_response(
             display_name: user.display_name.clone(),
             avatar_url: user.avatar_url.clone(),
             bio: user.bio.clone(),
+            is_bot: user.is_bot,
             created_at: user.created_at,
         },
     })

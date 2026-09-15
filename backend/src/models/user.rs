@@ -13,6 +13,7 @@ pub struct User {
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
     pub bio: Option<String>,
+    pub is_bot: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

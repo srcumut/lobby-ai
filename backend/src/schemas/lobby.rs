@@ -17,8 +17,20 @@ pub struct CreateLobbyRequest {
 
     pub is_private: Option<bool>,
     
-    #[validate(length(max = 100, message = "Password must be at most 100 characters"))]
     pub password: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateLobbyRequest {
+    #[validate(length(
+        min = 1,
+        max = 100,
+        message = "Lobby name must be between 1 and 100 characters"
+    ))]
+    pub name: Option<String>,
+
+    #[validate(length(max = 500, message = "Description must be at most 500 characters"))]
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -32,7 +44,7 @@ pub struct LobbyResponse {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, sqlx::FromRow)]
 #[allow(dead_code)] // Will be used for lobby member listing endpoint
 pub struct LobbyMemberResponse {
     pub user_id: Uuid,
@@ -40,7 +52,18 @@ pub struct LobbyMemberResponse {
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
     pub role: String,
+    pub is_bot: bool,
     pub joined_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct BannedUserResponse {
+    pub user_id: Uuid,
+    pub username: String,
+    pub display_name: Option<String>,
+    pub avatar_url: Option<String>,
+    pub banned_at: DateTime<Utc>,
+    pub banned_by: Uuid,
 }
 
 pub const ROLE_OWNER: &str = "OWNER";
@@ -72,6 +95,11 @@ pub struct JoinRequestResponse {
     pub display_name: Option<String>,
     pub status: String,
     pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct AddBotRequest {
+    pub bot_user_id: Uuid,
 }
 
 

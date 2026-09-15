@@ -9,6 +9,7 @@ pub struct AppConfig {
     pub jwt_refresh_secret: String,
     pub server_host: String,
     pub server_port: u16,
+    pub encryption_key: String,
 }
 
 impl AppConfig {
@@ -22,6 +23,7 @@ impl AppConfig {
                 .unwrap_or_else(|_| "8080".to_string())
                 .parse()
                 .map_err(|_| AppError::Internal("Invalid SERVER_PORT".to_string()))?,
+            encryption_key: require_env("ENCRYPTION_KEY")?,
         })
     }
 

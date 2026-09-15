@@ -108,3 +108,29 @@ pub async fn get_mute(
 
     Ok(mute)
 }
+
+pub async fn get_banned_users(
+    pool: &PgPool,
+    lobby_id: Uuid,
+) -> Result<Vec<crate::schemas::lobby::BannedUserResponse>, AppError> {
+    let bans = sqlx::query_as::<_, crate::schemas::lobby::BannedUserResponse>(
+        r#"
+        SELECT 
+            b.user_id, 
+            u.username, 
+            u.display_name, 
+            u.avatar_url, 
+            b.banned_at,
+            b.banned_by
+        FROM lobby_bans b
+        JOIN users u ON b.user_id = u.id
+        WHERE b.lobby_id = $1
+        ORDER BY b.banned_at DESC
+        "#,
+    )
+    .bind(lobby_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(bans)
+}

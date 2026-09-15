@@ -83,6 +83,17 @@ pub async fn list_requests(
     Ok(Json(requests))
 }
 
+
+pub async fn add_bot_to_lobby(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    Path(lobby_id): Path<Uuid>,
+    Json(payload): Json<crate::schemas::lobby::AddBotRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    lobby_service::add_bot_to_lobby(&state, lobby_id, auth.user_id, payload.bot_user_id).await?;
+    Ok(Json(serde_json::json!({"status": "success"})))
+}
+
 pub async fn approve_request(
     State(state): State<SharedState>,
     auth: AuthenticatedUser,
@@ -99,4 +110,61 @@ pub async fn reject_request(
 ) -> Result<Json<serde_json::Value>, AppError> {
     lobby_service::reject_request(&state, lobby_id, auth.user_id, user_id).await?;
     Ok(Json(serde_json::json!({ "message": "Request rejected" })))
+}
+
+pub async fn get_members(
+    State(state): State<SharedState>,
+    _auth: AuthenticatedUser,
+    Path(lobby_id): Path<Uuid>,
+) -> Result<Json<Vec<crate::schemas::lobby::LobbyMemberResponse>>, AppError> {
+    let members = crate::repositories::lobby_repository::get_members(&state.db, lobby_id).await?;
+    Ok(Json(members))
+}
+
+pub async fn get_banned_users(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    Path(lobby_id): Path<Uuid>,
+) -> Result<Json<Vec<crate::schemas::lobby::BannedUserResponse>>, AppError> {
+    // Only owner/moderator can see bans
+    let role = crate::repositories::lobby_repository::get_member_role(&state.db, lobby_id, auth.user_id).await?;
+    if role.as_deref() != Some(crate::schemas::lobby::ROLE_OWNER) && role.as_deref() != Some(crate::schemas::lobby::ROLE_MODERATOR) {
+        return Err(AppError::Forbidden("You don't have permission to view bans".to_string()));
+    }
+    
+    let bans = crate::repositories::moderation_repository::get_banned_users(&state.db, lobby_id).await?;
+    Ok(Json(bans))
+}
+
+pub async fn update_lobby(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    Path(lobby_id): Path<Uuid>,
+    Json(req): Json<crate::schemas::lobby::UpdateLobbyRequest>,
+) -> Result<Json<crate::schemas::lobby::LobbyResponse>, AppError> {
+    req.validate().map_err(|e| AppError::Validation(e.to_string()))?;
+    
+    let role = crate::repositories::lobby_repository::get_member_role(&state.db, lobby_id, auth.user_id).await?;
+    if role.as_deref() != Some(crate::schemas::lobby::ROLE_OWNER) {
+        return Err(AppError::Forbidden("Only the lobby owner can update settings".to_string()));
+    }
+    
+    let updated = crate::repositories::lobby_repository::update_lobby(
+        &state.db, 
+        lobby_id, 
+        req.name.as_deref(), 
+        req.description.as_deref()
+    ).await?;
+    
+    let member_count = crate::repositories::lobby_repository::get_member_count(&state.db, lobby_id).await?;
+    
+    Ok(Json(crate::schemas::lobby::LobbyResponse {
+        id: updated.id,
+        name: updated.name,
+        description: updated.description,
+        owner_id: updated.owner_id,
+        visibility: updated.visibility,
+        member_count,
+        created_at: updated.created_at,
+    }))
 }

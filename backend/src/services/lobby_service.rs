@@ -190,6 +190,42 @@ pub async fn list_join_requests(
     Ok(requests)
 }
 
+pub async fn add_bot_to_lobby(
+    state: &SharedState,
+    lobby_id: Uuid,
+    caller_id: Uuid,
+    bot_user_id: Uuid,
+) -> Result<(), AppError> {
+    // Verify caller is OWNER or MODERATOR
+    let role = lobby_repository::get_member_role(&state.db, lobby_id, caller_id).await?;
+    match role.as_deref() {
+        Some("OWNER") | Some("MODERATOR") => {}
+        _ => return Err(AppError::Forbidden("Only moderators can add bots".to_string())),
+    }
+
+    // Verify the bot actually is a bot
+    let is_bot = sqlx::query_scalar::<_, bool>("SELECT is_bot FROM users WHERE id = $1")
+        .bind(bot_user_id)
+        .fetch_optional(&state.db)
+        .await?
+        .unwrap_or(false);
+
+    if !is_bot {
+        return Err(AppError::Validation("User is not a bot".to_string()));
+    }
+
+    // Check if already member
+    let is_member = lobby_repository::is_member(&state.db, lobby_id, bot_user_id).await?;
+    if is_member {
+        return Err(AppError::Validation("Bot is already in the lobby".to_string()));
+    }
+
+    // Add bot to lobby as MEMBER
+    lobby_repository::add_member(&state.db, lobby_id, bot_user_id, "MEMBER").await?;
+
+    Ok(())
+}
+
 pub async fn approve_request(
     state: &SharedState,
     lobby_id: Uuid,

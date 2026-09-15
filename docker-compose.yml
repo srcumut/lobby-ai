@@ -11,10 +11,32 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lobby -d lobby_ai"]
+      test: [ "CMD-SHELL", "pg_isready -U lobby -d lobby_ai" ]
       interval: 5s
       timeout: 5s
       retries: 5
 
+  dbgate:
+    image: dbgate/dbgate
+    container_name: lobby-ai-dbgate
+    ports:
+      - "3001:3000"
+    environment:
+      CONNECTIONS: L
+      LABEL_L: LobbyAI Database
+      SERVER_L: postgres
+      USER_L: lobby
+      PASSWORD_L: lobby_dev_password
+      PORT_L: 5432
+      DATABASE_L: lobby_ai
+      ENGINE_L: postgres@dbgate-plugin-postgres
+    volumes:
+      - dbgate_data:/root/.dbgate
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  dbgate_data:
+

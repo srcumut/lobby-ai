@@ -14,7 +14,7 @@ pub async fn create_notification(
     message: &str,
     related_entity_id: Option<Uuid>,
 ) -> Result<(), AppError> {
-    let notification = notification_repository::create_notification(
+    let notification: crate::models::notification::Notification = notification_repository::create_notification(
         &state.db,
         user_id,
         notification_type,

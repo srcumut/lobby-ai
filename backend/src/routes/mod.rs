@@ -6,6 +6,7 @@ mod lobby_routes;
 mod notification_routes;
 mod user_routes;
 mod ws_routes;
+mod ai_routes;
 
 pub fn create_router(state: SharedState) -> axum::Router {
     axum::Router::new()
@@ -15,6 +16,7 @@ pub fn create_router(state: SharedState) -> axum::Router {
                 .merge(lobby_routes::routes())
                 .merge(user_routes::routes())
                 .merge(notification_routes::routes())
+                .nest("/api/ai", ai_routes::routes())
                 .layer(axum::middleware::from_fn_with_state(
                     state.clone(),
                     crate::middleware::rate_limiter::api_rate_limit_middleware,

@@ -3,7 +3,7 @@ use serde::Serialize;
 use sqlx::FromRow;
 use uuid::Uuid;
 
-#[derive(Debug, FromRow, Serialize)]
+#[derive(Debug, FromRow, Serialize, Clone)]
 pub struct Message {
     pub id: Uuid,
     pub lobby_id: Uuid,

@@ -43,7 +43,7 @@ pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Lobby>, AppErr
 
 pub async fn list_public_lobbies(pool: &PgPool) -> Result<Vec<Lobby>, AppError> {
     let lobbies = sqlx::query_as::<_, Lobby>(
-        "SELECT id, name, description, owner_id, visibility, password_hash, created_at, updated_at FROM lobbies WHERE visibility = 'PUBLIC' ORDER BY created_at DESC",
+        "SELECT id, name, description, owner_id, visibility, password_hash, created_at, updated_at FROM lobbies ORDER BY created_at DESC",
     )
     .fetch_all(pool)
     .await?;
@@ -142,3 +142,61 @@ pub async fn update_member_role(
     Ok(member)
 }
 
+pub async fn get_members(
+    pool: &PgPool,
+    lobby_id: Uuid,
+) -> Result<Vec<crate::schemas::lobby::LobbyMemberResponse>, AppError> {
+    let members = sqlx::query_as::<_, crate::schemas::lobby::LobbyMemberResponse>(
+        r#"
+        SELECT 
+            m.user_id, 
+            u.username, 
+            u.display_name, 
+            u.avatar_url, 
+            m.role, 
+            u.is_bot,
+            m.joined_at
+        FROM lobby_members m
+        JOIN users u ON m.user_id = u.id
+        WHERE m.lobby_id = $1
+        ORDER BY 
+            CASE m.role 
+                WHEN 'OWNER' THEN 1 
+                WHEN 'MODERATOR' THEN 2 
+                ELSE 3 
+            END,
+            m.joined_at ASC
+        "#,
+    )
+    .bind(lobby_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(members)
+}
+
+pub async fn update_lobby(
+    pool: &PgPool,
+    lobby_id: Uuid,
+    name: Option<&str>,
+    description: Option<&str>,
+) -> Result<Lobby, AppError> {
+    let lobby = sqlx::query_as::<_, Lobby>(
+        r#"
+        UPDATE lobbies 
+        SET 
+            name = COALESCE($1, name),
+            description = COALESCE($2, description),
+            updated_at = NOW()
+        WHERE id = $3
+        RETURNING id, name, description, owner_id, visibility, password_hash, created_at, updated_at
+        "#,
+    )
+    .bind(name)
+    .bind(description)
+    .bind(lobby_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(lobby)
+}

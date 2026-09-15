@@ -31,16 +31,31 @@ pub async fn ws_handler(
     State(state): State<SharedState>,
 ) -> Result<Response, AppError> {
     // Authenticate via query parameter token
-    let claims = jwt::validate_token(&params.token, &state.config.jwt_access_secret)?;
+    let claims = match jwt::validate_token(&params.token, &state.config.jwt_access_secret) {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!("WebSocket auth failed: {:?}", e);
+            return Err(e);
+        }
+    };
     let user_id = claims.sub;
 
     // Verify lobby membership
-    if !lobby_repository::is_member(&state.db, lobby_id, user_id).await? {
-        return Err(AppError::Forbidden(
-            "You must be a member of this lobby to connect".to_string(),
-        ));
+    match lobby_repository::is_member(&state.db, lobby_id, user_id).await {
+        Ok(true) => {}
+        Ok(false) => {
+            tracing::error!("User {} is not a member of lobby {}", user_id, lobby_id);
+            return Err(AppError::Forbidden(
+                "You must be a member of this lobby to connect".to_string(),
+            ));
+        }
+        Err(e) => {
+            tracing::error!("Database error checking membership: {:?}", e);
+            return Err(e.into());
+        }
     }
 
+    tracing::info!("User {} successfully authenticated for WS lobby {}", user_id, lobby_id);
     Ok(ws.on_upgrade(move |socket| handle_socket(socket, state, lobby_id, user_id)))
 }
 

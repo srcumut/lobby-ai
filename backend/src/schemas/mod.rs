@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod auth;
 pub mod lobby;
 pub mod message;

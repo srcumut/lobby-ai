@@ -5,6 +5,7 @@ use crate::errors::AppError;
 use crate::models::lobby::{LobbyBan, LobbyMember, LobbyMute};
 use crate::repositories::{lobby_repository, moderation_repository};
 use crate::schemas::lobby::{ROLE_MEMBER, ROLE_MODERATOR, ROLE_OWNER};
+use crate::schemas::ws_event::WsOutgoingEvent;
 use crate::state::SharedState;
 
 async fn check_permission(
@@ -37,6 +38,15 @@ pub async fn kick_user(
 ) -> Result<(), AppError> {
     check_permission(state, lobby_id, executor_id, target_id).await?;
     
+    let event = WsOutgoingEvent {
+        event_type: "moderation.event".to_string(),
+        payload: serde_json::json!({
+            "action": "kick",
+            "target_user_id": target_id,
+        }),
+    };
+    state.lobby_manager.broadcast(lobby_id, event).await;
+
     lobby_repository::remove_member(&state.db, lobby_id, target_id).await?;
     
     // Also unsubscribe from websocket if connected
@@ -63,6 +73,15 @@ pub async fn ban_user(
 ) -> Result<LobbyBan, AppError> {
     check_permission(state, lobby_id, executor_id, target_id).await?;
     
+    let event = WsOutgoingEvent {
+        event_type: "moderation.event".to_string(),
+        payload: serde_json::json!({
+            "action": "ban",
+            "target_user_id": target_id,
+        }),
+    };
+    state.lobby_manager.broadcast(lobby_id, event).await;
+
     // Remove them from the lobby first (which acts as a kick)
     lobby_repository::remove_member(&state.db, lobby_id, target_id).await?;
     state.lobby_manager.unsubscribe(lobby_id, target_id);
@@ -112,6 +131,16 @@ pub async fn mute_user(
     let muted_until = duration_minutes.map(|mins| Utc::now() + Duration::minutes(mins));
     let mute = moderation_repository::mute_user(&state.db, lobby_id, target_id, executor_id, muted_until).await?;
     
+    let event = WsOutgoingEvent {
+        event_type: "moderation.event".to_string(),
+        payload: serde_json::json!({
+            "action": "mute",
+            "target_user_id": target_id,
+            "duration_minutes": duration_minutes,
+        }),
+    };
+    state.lobby_manager.broadcast(lobby_id, event).await;
+
     let lobby = lobby_repository::find_by_id(&state.db, lobby_id).await?.unwrap();
     let duration_str = match duration_minutes {
         Some(mins) => format!("{} dakika süreliğine", mins),
@@ -136,7 +165,20 @@ pub async fn unmute_user(
     target_id: Uuid,
 ) -> Result<bool, AppError> {
     check_permission(state, lobby_id, executor_id, target_id).await?;
-    moderation_repository::unmute_user(&state.db, lobby_id, target_id).await
+    let res = moderation_repository::unmute_user(&state.db, lobby_id, target_id).await;
+    
+    if res.is_ok() {
+        let event = WsOutgoingEvent {
+            event_type: "moderation.event".to_string(),
+            payload: serde_json::json!({
+                "action": "unmute",
+                "target_user_id": target_id,
+            }),
+        };
+        state.lobby_manager.broadcast(lobby_id, event).await;
+    }
+    
+    res
 }
 
 pub async fn set_role(

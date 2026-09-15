@@ -24,8 +24,17 @@ pub async fn get_me(
         display_name: user.display_name,
         avatar_url: user.avatar_url,
         bio: user.bio,
+        is_bot: user.is_bot,
         created_at: user.created_at,
     }))
+}
+
+pub async fn get_public_profile(
+    State(state): State<SharedState>,
+    axum::extract::Path(user_id): axum::extract::Path<uuid::Uuid>,
+) -> Result<Json<crate::schemas::auth::PublicUserProfile>, AppError> {
+    let profile = user_service::get_public_profile(&state, user_id).await?;
+    Ok(Json(profile))
 }
 
 pub async fn update_profile(

@@ -4,3 +4,4 @@ pub mod message_handler;
 pub mod moderation_handler;
 pub mod notification_handler;
 pub mod user_handler;
+pub mod ai_handler;

@@ -55,6 +55,18 @@ pub struct UserInfo {
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
     pub bio: Option<String>,
+    pub is_bot: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PublicUserProfile {
+    pub id: Uuid,
+    pub username: String,
+    pub display_name: Option<String>,
+    pub avatar_url: Option<String>,
+    pub bio: Option<String>,
+    pub is_bot: bool,
     pub created_at: DateTime<Utc>,
 }
 

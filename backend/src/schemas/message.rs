@@ -8,6 +8,7 @@ pub struct MessageResponse {
     pub lobby_id: Uuid,
     pub sender: MessageSender,
     pub content: String,
+    pub is_bot: bool,
     pub created_at: DateTime<Utc>,
     pub reactions: std::collections::HashMap<String, Vec<Uuid>>, // reaction -> list of user_ids
 }

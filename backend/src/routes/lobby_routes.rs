@@ -13,7 +13,10 @@ pub fn routes() -> Router<SharedState> {
             "/api/lobbies",
             post(lobby_handler::create_lobby).get(lobby_handler::list_lobbies),
         )
-        .route("/api/lobbies/{id}", get(lobby_handler::get_lobby))
+        .route("/api/lobbies/{id}", get(lobby_handler::get_lobby).put(lobby_handler::update_lobby))
+        .route("/api/lobbies/{id}/members", get(lobby_handler::get_members))
+        .route("/api/lobbies/{id}/bans", get(lobby_handler::get_banned_users))
+        .route("/api/lobbies/{id}/bots", post(lobby_handler::add_bot_to_lobby))
         .route("/api/lobbies/{id}/join", post(lobby_handler::join_lobby))
         .route("/api/lobbies/{id}/leave", post(lobby_handler::leave_lobby))
         .route(
