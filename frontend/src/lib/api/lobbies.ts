@@ -102,5 +102,30 @@ export const lobbiesApi = {
   addBotToLobby: async (lobbyId: string, botUserId: string) => {
     const response = await apiClient.post(`/lobbies/${lobbyId}/bots`, { bot_user_id: botUserId });
     return response.data;
-  }
+  },
+
+  setMemberRole: async (lobbyId: string, userId: string, role: string): Promise<void> => {
+    await apiClient.post(`/lobbies/${lobbyId}/moderation/role/${userId}`, { role });
+  },
+
+  updateNotificationPreference: async (lobbyId: string, preference: "ALL" | "MENTIONS_ONLY" | "MUTE"): Promise<void> => {
+    await apiClient.put(`/lobbies/${lobbyId}/notifications`, { preference });
+  },
+
+  getJoinRequests: async (lobbyId: string): Promise<import('../../types').JoinRequest[]> => {
+    const response = await apiClient.get<import('../../types').JoinRequest[]>(`/lobbies/${lobbyId}/requests`);
+    return response.data;
+  },
+
+  approveJoinRequest: async (lobbyId: string, userId: string): Promise<void> => {
+    await apiClient.post(`/lobbies/${lobbyId}/requests/${userId}/approve`);
+  },
+
+  rejectJoinRequest: async (lobbyId: string, userId: string): Promise<void> => {
+    await apiClient.post(`/lobbies/${lobbyId}/requests/${userId}/reject`);
+  },
+
+  inviteUser: async (lobbyId: string, payload: { username?: string; user_id?: string }): Promise<void> => {
+    await apiClient.post(`/lobbies/${lobbyId}/invites`, payload);
+  },
 };

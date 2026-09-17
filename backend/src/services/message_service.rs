@@ -5,9 +5,7 @@ use crate::repositories::{message_repository, user_repository};
 use crate::schemas::message::{MessageResponse, MessageSender};
 use crate::state::SharedState;
 
-lazy_static::lazy_static! {
-    static ref MENTION_RE: regex::Regex = regex::Regex::new(r"@([a-zA-Z0-9_]{3,32})").unwrap();
-}
+
 
 const MAX_MESSAGE_LENGTH: usize = 2000;
 const DEFAULT_MESSAGE_LIMIT: i64 = 50;
@@ -54,46 +52,68 @@ pub async fn create_message(
 
     // --- NEW: AI Bot Mention Detection ---
     if !sender.is_bot {
-        let mut mentioned_usernames = std::collections::HashSet::new();
-        for cap in MENTION_RE.captures_iter(trimmed) {
-            if let Some(username) = cap.get(1) {
-                mentioned_usernames.insert(username.as_str().to_string());
-            }
-        }
-        
-        if !mentioned_usernames.is_empty() {
-            tracing::info!("Found mentions: {:?}", mentioned_usernames);
-            let usernames_vec: Vec<String> = mentioned_usernames.into_iter().collect();
-            // Fetch users with these usernames who are bots
-            let bots = sqlx::query_scalar::<_, Uuid>(
-                "SELECT id FROM users WHERE username = ANY($1) AND is_bot = true",
-            )
-            .bind(&usernames_vec)
-            .fetch_all(&state.db)
-            .await
-            .unwrap_or_default();
-            
-            for bot_id in bots {
-                // Check if bot is a member of the lobby
-                let is_member = crate::repositories::lobby_repository::is_member(&state.db, lobby_id, bot_id)
-                    .await
-                    .unwrap_or(false);
-                    
-                if is_member {
-                    tracing::info!("Triggering AI response for bot: {}", bot_id);
-                    crate::services::ai_service::handle_agent_mention(
-                        state.clone(),
-                        lobby_id,
-                        message.clone(),
-                        bot_id,
-                    );
-                } else {
-                    tracing::info!("Bot {} is not a member of lobby {}", bot_id, lobby_id);
+        crate::services::ai_service::handle_agent_mention(
+            state.clone(),
+            lobby_id,
+            message.clone(),
+        );
+    }
+    // --- END NEW ---
+
+    // --- Lobby Notification & Mentions Logic ---
+    if !sender.is_bot {
+        // Extract all @mentions from the message content (e.g. "@username hello @other")
+        let mention_regex = regex::Regex::new(r"@([a-zA-Z0-9_]+)").unwrap();
+        let mentioned_usernames: std::collections::HashSet<String> = mention_regex
+            .captures_iter(&trimmed)
+            .filter_map(|cap| cap.get(1).map(|m| m.as_str().to_lowercase()))
+            .collect();
+
+        if let Ok(members) = crate::repositories::lobby_repository::get_members(&state.db, lobby_id).await {
+            let lobby = crate::repositories::lobby_repository::find_by_id(&state.db, lobby_id).await.ok().flatten();
+            let lobby_name = lobby.as_ref().map(|l| l.name.as_str()).unwrap_or("Lobi");
+            let sender_name = sender.display_name.as_deref().unwrap_or(&sender.username);
+            let preview = if trimmed.chars().count() > 40 {
+                format!("{}...", trimmed.chars().take(40).collect::<String>())
+            } else {
+                trimmed.to_string()
+            };
+
+            for member in members {
+                // Do not notify sender or bot accounts
+                if member.user_id == sender_id || member.is_bot {
+                    continue;
+                }
+
+                let pref = member.notification_preference.as_deref().unwrap_or("MENTIONS_ONLY");
+                let is_mentioned = mentioned_usernames.contains(&member.username.to_lowercase());
+
+                let should_notify = match pref {
+                    "ALL" => true,
+                    "MENTIONS_ONLY" => is_mentioned,
+                    "MUTE" => false,
+                    _ => is_mentioned,
+                };
+
+                if should_notify {
+                    let (notif_type, notif_title) = if is_mentioned {
+                        ("LOBBY_MENTION", format!("@{} sizi {} lobisinde etiketledi", sender_name, lobby_name))
+                    } else {
+                        ("LOBBY_MESSAGE", format!("{}: {}", sender_name, lobby_name))
+                    };
+
+                    let _ = crate::services::notification_service::create_notification(
+                        state,
+                        member.user_id,
+                        notif_type,
+                        &notif_title,
+                        &preview,
+                        Some(lobby_id),
+                    ).await;
                 }
             }
         }
     }
-    // --- END NEW ---
 
     Ok(MessageResponse {
         id: message.id,

@@ -29,6 +29,7 @@ pub struct LobbyMember {
     pub lobby_id: Uuid,
     pub user_id: Uuid,
     pub role: String,
+    pub notification_preference: String,
     pub joined_at: DateTime<Utc>,
 }
 

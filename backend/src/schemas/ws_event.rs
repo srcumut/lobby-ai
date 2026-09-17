@@ -28,3 +28,4 @@ pub const EVENT_USER_JOINED: &str = "user.joined";
 pub const EVENT_USER_LEFT: &str = "user.left";
 pub const EVENT_MESSAGE_SEND: &str = "message.send";
 pub const EVENT_MESSAGE_REACTION_UPDATED: &str = "message.reaction_updated";
+pub const EVENT_DIRECT_MESSAGE_CREATED: &str = "direct_message.created";

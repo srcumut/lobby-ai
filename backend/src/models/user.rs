@@ -17,3 +17,13 @@ pub struct User {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
+
+#[derive(Debug, FromRow, Serialize)]
+pub struct FriendRequest {
+    pub id: Uuid,
+    pub sender_id: Uuid,
+    pub receiver_id: Uuid,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}

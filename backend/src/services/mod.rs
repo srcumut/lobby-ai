@@ -5,3 +5,5 @@ pub mod notification_service;
 pub mod moderation_service;
 pub mod user_service;
 pub mod ai_service;
+pub mod upload_service;
+pub mod direct_message_service;

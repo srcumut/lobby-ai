@@ -47,7 +47,7 @@ pub struct AuthResponse {
     pub user: UserInfo,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserInfo {
     pub id: Uuid,
     pub username: String,
@@ -75,7 +75,7 @@ pub struct UpdateProfileRequest {
     #[validate(length(max = 64, message = "Display name must be at most 64 characters"))]
     pub display_name: Option<String>,
 
-    #[validate(url(message = "Avatar URL must be a valid URL"))]
+    #[validate(length(max = 2048, message = "Avatar URL must be at most 2048 characters"))]
     pub avatar_url: Option<String>,
 
     #[validate(length(max = 500, message = "Bio must be at most 500 characters"))]

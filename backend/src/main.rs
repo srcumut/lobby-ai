@@ -42,6 +42,11 @@ async fn main() {
     // Load configuration
     let config = AppConfig::from_env().expect("Failed to load configuration");
 
+    // Ensure uploads directory exists on disk for avatar storage
+    if let Err(e) = tokio::fs::create_dir_all("uploads/avatars").await {
+        tracing::warn!("Could not pre-create uploads/avatars directory: {e}");
+    }
+
     // Create database connection pool
     let db = PgPoolOptions::new()
         .max_connections(20)

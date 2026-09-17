@@ -20,6 +20,10 @@ pub fn routes() -> Router<SharedState> {
         .route("/api/lobbies/{id}/join", post(lobby_handler::join_lobby))
         .route("/api/lobbies/{id}/leave", post(lobby_handler::leave_lobby))
         .route(
+            "/api/lobbies/{id}/notifications",
+            axum::routing::put(lobby_handler::update_notification_preference),
+        )
+        .route(
             "/api/lobbies/{id}/messages",
             get(message_handler::get_messages),
         )
@@ -56,5 +60,9 @@ pub fn routes() -> Router<SharedState> {
         .route(
             "/api/lobbies/{id}/requests/{user_id}/reject",
             post(lobby_handler::reject_request),
+        )
+        .route(
+            "/api/lobbies/{id}/invites",
+            post(lobby_handler::invite_user),
         )
 }

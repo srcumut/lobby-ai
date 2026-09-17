@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { MessageSquare } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 import { usersApi } from "@/lib/api/users";
 import { PublicUserProfile } from "@/types";
 
@@ -11,6 +15,8 @@ interface UserProfileDialogProps {
 }
 
 export function UserProfileDialog({ userId, isOpen, onClose }: UserProfileDialogProps) {
+  const router = useRouter();
+  const { user } = useAuth();
   const [profile, setProfile] = useState<PublicUserProfile | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +81,19 @@ export function UserProfileDialog({ userId, isOpen, onClose }: UserProfileDialog
                 Joined: {new Date(profile.created_at).toLocaleDateString()}
               </p>
             </div>
+
+            {!profile.is_bot && user && user.id !== profile.id && (
+              <Button
+                onClick={() => {
+                  router.push(`/messages?userId=${profile.id}`);
+                  onClose();
+                }}
+                className="w-full bg-[#FEF08A] hover:bg-[#fde047] text-black border-2 border-black font-black text-sm uppercase shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:-translate-y-0.5 hover:shadow-[3px_3px_0_0_rgba(0,0,0,1)] transition-all cursor-pointer mt-2"
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Send Direct Message
+              </Button>
+            )}
           </div>
         ) : null}
       </DialogContent>

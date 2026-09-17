@@ -4,3 +4,5 @@ pub mod lobby;
 pub mod message;
 pub mod notification;
 pub mod ws_event;
+pub mod user;
+pub mod direct_message;

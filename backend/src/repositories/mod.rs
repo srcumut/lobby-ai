@@ -5,3 +5,4 @@ pub mod notification_repository;
 pub mod reaction_repository;
 pub mod request_repository;
 pub mod user_repository;
+pub mod direct_message_repository;

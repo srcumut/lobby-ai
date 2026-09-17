@@ -5,3 +5,5 @@ pub mod moderation_handler;
 pub mod notification_handler;
 pub mod user_handler;
 pub mod ai_handler;
+pub mod direct_message_handler;
+pub mod upload_handler;

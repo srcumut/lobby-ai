@@ -115,7 +115,7 @@ export default function LobbiesPage() {
 
   return (
     <ProtectedRoute>
-      <div className="flex-1 max-w-5xl w-full mx-auto space-y-6">
+      <div className="flex-1 max-w-7xl w-full mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex flex-col gap-2">
           <h1 className="text-4xl sm:text-5xl font-black uppercase tracking-tighter drop-shadow-[2px_2px_0_rgba(0,0,0,1)]">

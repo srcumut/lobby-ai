@@ -1,4 +1,4 @@
-use axum::{extract::State, Json};
+use axum::{extract::{Multipart, State}, Json};
 
 use validator::Validate;
 
@@ -6,7 +6,8 @@ use crate::errors::AppError;
 use crate::middleware::auth_middleware::AuthenticatedUser;
 use crate::repositories::user_repository;
 use crate::schemas::auth::{UpdateProfileRequest, UserInfo};
-use crate::services::user_service;
+use crate::schemas::user::{FriendRequestPayload, FriendRequestResponse, IncomingFriendRequest};
+use crate::services::{upload_service, user_service};
 use crate::state::SharedState;
 
 pub async fn get_me(
@@ -48,4 +49,74 @@ pub async fn update_profile(
 
     let response = user_service::update_profile(&state, auth.user_id, request).await?;
     Ok(Json(response))
+}
+
+pub async fn upload_my_avatar(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    multipart: Multipart,
+) -> Result<Json<UserInfo>, AppError> {
+    let avatar_url = upload_service::save_avatar_file(multipart).await?;
+    let updated_user = user_service::update_avatar(&state, auth.user_id, Some(avatar_url)).await?;
+    Ok(Json(updated_user))
+}
+
+pub async fn delete_my_avatar(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+) -> Result<Json<UserInfo>, AppError> {
+    let updated_user = user_service::update_avatar(&state, auth.user_id, None).await?;
+    Ok(Json(updated_user))
+}
+
+pub async fn send_friend_request(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    Json(payload): Json<FriendRequestPayload>,
+) -> Result<Json<FriendRequestResponse>, AppError> {
+    let resp = user_service::send_friend_request(&state, auth.user_id, payload).await?;
+    Ok(Json(resp))
+}
+
+pub async fn get_pending_incoming_requests(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+) -> Result<Json<Vec<IncomingFriendRequest>>, AppError> {
+    let reqs = user_service::get_pending_incoming_requests(&state, auth.user_id).await?;
+    Ok(Json(reqs))
+}
+
+pub async fn accept_friend_request(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    axum::extract::Path(request_id): axum::extract::Path<uuid::Uuid>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    user_service::accept_friend_request(&state, auth.user_id, request_id).await?;
+    Ok(Json(serde_json::json!({ "message": "Friend request accepted" })))
+}
+
+pub async fn reject_friend_request(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    axum::extract::Path(request_id): axum::extract::Path<uuid::Uuid>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    user_service::reject_friend_request(&state, auth.user_id, request_id).await?;
+    Ok(Json(serde_json::json!({ "message": "Friend request rejected" })))
+}
+
+pub async fn remove_friend(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    axum::extract::Path(friend_id): axum::extract::Path<uuid::Uuid>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    user_service::remove_friend(&state, auth.user_id, friend_id).await?;
+    Ok(Json(serde_json::json!({ "message": "Friend removed" })))
+}
+
+pub async fn get_friends(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+) -> Result<Json<Vec<UserInfo>>, AppError> {
+    let friends = user_service::get_friends(&state, auth.user_id).await?;
+    Ok(Json(friends))
 }

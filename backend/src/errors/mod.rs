@@ -24,6 +24,12 @@ pub enum AppError {
 
     #[error("{0}")]
     Internal(String),
+
+    #[error("{0}")]
+    BadRequest(String),
+
+    #[error("{0}")]
+    DatabaseError(String),
 }
 
 #[derive(Serialize)]
@@ -41,12 +47,14 @@ impl AppError {
     fn status_and_code(&self) -> (StatusCode, &'static str) {
         match self {
             Self::Validation(_) => (StatusCode::BAD_REQUEST, "VALIDATION_ERROR"),
+            Self::BadRequest(_) => (StatusCode::BAD_REQUEST, "BAD_REQUEST"),
             Self::NotFound(_) => (StatusCode::NOT_FOUND, "NOT_FOUND"),
             Self::Unauthorized(_) => (StatusCode::UNAUTHORIZED, "UNAUTHORIZED"),
             Self::Forbidden(_) => (StatusCode::FORBIDDEN, "FORBIDDEN"),
             Self::Conflict(_) => (StatusCode::CONFLICT, "CONFLICT"),
             Self::TooManyRequests(_) => (StatusCode::TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS"),
             Self::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR"),
+            Self::DatabaseError(_) => (StatusCode::INTERNAL_SERVER_ERROR, "DATABASE_ERROR"),
         }
     }
 }

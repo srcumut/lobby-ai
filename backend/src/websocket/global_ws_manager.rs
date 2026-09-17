@@ -46,7 +46,7 @@ impl GlobalWsManager {
                 let conn_id = *entry.key();
                 let sender = entry.value();
 
-                if sender.try_send(event.clone()).is_err() {
+                if sender.send(event.clone()).await.is_err() {
                     stale_conns.push(conn_id);
                 }
             }

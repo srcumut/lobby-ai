@@ -30,10 +30,10 @@ export function CredentialsModal({ isOpen, onClose, onSuccess }: CredentialsModa
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!apiKey) {
-      toast({
+      toast.add({
         title: "Validation Error",
         description: "API Key is required.",
-        variant: "destructive",
+        type: "error",
       });
       return;
     }
@@ -73,7 +73,7 @@ export function CredentialsModal({ isOpen, onClose, onSuccess }: CredentialsModa
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="provider" className="font-black">Provider</Label>
-            <Select value={provider} onValueChange={setProvider}>
+            <Select value={provider} onValueChange={(val) => { if (val) setProvider(val); }}>
               <SelectTrigger className="w-full bg-white brutal-border border-2 shadow-[2px_2px_0_0_rgba(0,0,0,1)] font-bold">
                 <SelectValue placeholder="Select a provider" />
               </SelectTrigger>

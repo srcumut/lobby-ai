@@ -32,6 +32,30 @@ pub struct CreateAgentRequest {
     
     #[validate(length(max = 2000, message = "Custom instructions must be at most 2000 characters"))]
     pub custom_instructions: Option<String>,
+
+    pub avatar_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateAgentRequest {
+    #[validate(length(min = 1, max = 64, message = "Agent name must be between 1 and 64 characters"))]
+    pub name: String,
+    
+    #[validate(length(min = 1, message = "Provider is required"))]
+    pub provider: String,
+    
+    #[validate(length(min = 1, message = "Model is required"))]
+    pub model: String,
+    
+    pub personality_config: Option<serde_json::Value>,
+    pub interest_config: Option<serde_json::Value>,
+    pub communication_config: Option<serde_json::Value>,
+    pub behavior_config: Option<serde_json::Value>,
+    
+    #[validate(length(max = 2000, message = "Custom instructions must be at most 2000 characters"))]
+    pub custom_instructions: Option<String>,
+
+    pub avatar_url: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Validate)]

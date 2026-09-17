@@ -1,3 +1,8 @@
+// ============================================================================
+// TARGET_DESTINATION: frontend/src/app/lobby/[id]/page.tsx
+// PURPOSE: Real-time Lobby Chat page with avatar thumbnails for users and AI bots
+// ============================================================================
+
 "use client";
 
 import { useEffect, useState, useRef, use } from "react";
@@ -17,9 +22,11 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Ban, UserMinus, MicOff, Mic, Settings } from "lucide-react";
+import { MoreVertical, Ban, UserMinus, MicOff, Mic, Settings, Bot } from "lucide-react";
 import { LobbySettingsDialog } from "@/components/lobby/LobbySettingsDialog";
 import { UserProfileDialog } from "@/components/profile/UserProfileDialog";
+import { MembersList } from "@/components/lobby/MembersList";
+import { getAvatarUrl } from "@/lib/avatar";
 
 export default function LobbyChatPage({ params }: { params: Promise<{ id: string }> }) {
   // Use React.use to unwrap params in Next.js 15+
@@ -35,7 +42,7 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -182,9 +189,11 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
     }
   }, [lastMessage, user?.id, lobbyId, router]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll messages container to bottom without scrolling ancestors
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
   }, [messages]);
 
   const handleSendMessage = (e: React.FormEvent) => {
@@ -215,7 +224,7 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
   };
 
   const filteredMentions = mentionQuery !== null 
-    ? lobbyMembers.filter(m => m.username.toLowerCase().includes(mentionQuery.toLowerCase()) && m.is_bot)
+    ? lobbyMembers.filter(m => m.username.toLowerCase().includes(mentionQuery.toLowerCase()) && m.user_id !== user?.id)
     : [];
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -240,7 +249,6 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
     const textBeforeCursor = inputMessage.slice(0, cursor);
     const textAfterCursor = inputMessage.slice(cursor);
     
-    // Using a more robust regex that just replaces the last @... segment before the cursor
     const newTextBefore = textBeforeCursor.replace(/@[a-zA-Z0-9_]*$/, `@${username} `);
     setInputMessage(newTextBefore + textAfterCursor);
     setMentionQuery(null);
@@ -256,7 +264,28 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
     }
   };
 
-
+  const renderMessageContent = (content: string, currentUsername?: string) => {
+    const parts = content.split(/(@[a-zA-Z0-9_]+)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith("@") && part.length > 1) {
+        const mentionedName = part.slice(1);
+        const isMe = currentUsername && mentionedName.toLowerCase() === currentUsername.toLowerCase();
+        return (
+          <span
+            key={index}
+            className={`inline-block font-bold rounded px-1.5 py-0.5 text-xs mx-0.5 border ${
+              isMe
+                ? "bg-[#FEF08A] text-black border-black shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]"
+                : "bg-blue-100 text-blue-900 border-blue-400"
+            }`}
+          >
+            {part}
+          </span>
+        );
+      }
+      return part;
+    });
+  };
 
   if (isLoading) {
     return (
@@ -280,7 +309,10 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
 
   return (
     <ProtectedRoute>
-    <div className="flex flex-col h-full bg-white brutal-border brutal-shadow rounded-md overflow-hidden">
+    <div className="flex h-full min-h-0 w-full bg-[#f8fafc] border-4 border-black brutal-shadow rounded-sm overflow-hidden">
+      
+      {/* Center Column: Chat Area */}
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-[#f4f4f5] h-full">
       {/* Header */}
       <div className="bg-[#FFE4E6] border-b-4 border-black p-4 flex justify-between items-center z-10 shrink-0">
         <div>
@@ -314,7 +346,7 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
       )}
 
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-[#f4f4f5] flex flex-col gap-4">
+      <div ref={chatScrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 bg-[#f4f4f5] flex flex-col gap-4">
         {messages.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-foreground/50 font-medium">
             No messages yet. Say hello!
@@ -322,8 +354,9 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
         ) : (
           messages.map((msg) => {
             const isMe = msg.sender.id === user?.id;
-            // Bot messages get special treatment: Electric Cyan background
-            const bubbleBg = msg.is_bot ? "bg-[#06b6d4] text-white" : isMe ? "bg-[#a78bfa]" : "bg-white";
+            
+            // Calmer Neo-Brutalist bubbles
+            const bubbleBg = msg.is_bot ? "bg-[#cffafe]" : isMe ? "bg-[#f3e8ff]" : "bg-white";
             const alignmentClass = isMe ? "self-end" : "self-start";
             
             return (
@@ -332,27 +365,49 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
                   {!isMe && (
                     <>
                       <span 
-                        className="font-bold text-sm cursor-pointer hover:underline text-blue-600" 
+                        className="font-bold text-sm cursor-pointer hover:underline text-black" 
                         onClick={() => handleOpenProfile(msg.sender.id)}
                       >
                         {msg.sender.username}
                       </span>
                       {msg.is_bot && (
-                        <Badge className="bg-black text-white text-[10px] h-4 py-0 px-1 border-none shadow-none font-bold">
-                          ROBOT
+                        <Badge className="bg-black text-white text-[9px] h-4 py-0 px-1 border-none shadow-none font-bold uppercase tracking-wider">
+                          Bot
                         </Badge>
                       )}
                     </>
                   )}
-                  <span className="text-xs text-foreground/50 font-medium">
+                  <span className="text-xs text-gray-500 font-bold">
                     {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
                 
                 <div className="flex items-start gap-2">
-                  <div className={`${bubbleBg} p-3 brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-sm group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all`}>
-                    <p className="whitespace-pre-wrap font-medium break-words leading-relaxed">
-                      {msg.content}
+                  {/* Sender Avatar Thumbnail */}
+                  <div
+                    className={`w-8 h-8 rounded-full border-2 border-black overflow-hidden flex items-center justify-center font-black text-xs shrink-0 cursor-pointer shadow-[1px_1px_0_0_rgba(0,0,0,1)] ${
+                      msg.is_bot ? "bg-[#FEF08A] text-black" : "bg-[#A78BFA] text-white"
+                    } ${isMe ? "order-last" : ""}`}
+                    onClick={() => !isMe && handleOpenProfile(msg.sender.id)}
+                    title={msg.sender.username}
+                  >
+                    {msg.sender.avatar_url ? (
+                      <img
+                        src={getAvatarUrl(msg.sender.avatar_url)}
+                        alt={msg.sender.username}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : msg.is_bot ? (
+                      <Bot className="w-4 h-4 text-black" />
+                    ) : (
+                      msg.sender.username.charAt(0).toUpperCase()
+                    )}
+                  </div>
+
+                  {/* Message Content Bubble */}
+                  <div className={`${bubbleBg} px-4 py-2.5 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] rounded-sm group-hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-shadow`}>
+                    <p className="whitespace-pre-wrap font-medium break-words leading-relaxed text-black/90">
+                      {renderMessageContent(msg.content, user?.username)}
                     </p>
                   </div>
                   
@@ -395,22 +450,36 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
             );
           })
         )}
-        <div ref={messagesEndRef} />
+        {/* End of messages */}
       </div>
 
       {/* Input Area */}
       <div className="bg-[#FEF08A] border-t-4 border-black p-4 shrink-0 relative">
         {mentionQuery !== null && filteredMentions.length > 0 && (
-          <div className="absolute bottom-full left-4 mb-2 bg-white brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-sm overflow-hidden z-50 min-w-[200px]">
-            <div className="bg-black text-white px-2 py-1 text-xs font-bold">Mention Bot</div>
+          <div className="absolute bottom-full left-4 mb-2 bg-white brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-sm overflow-hidden z-50 min-w-[220px] max-h-48 overflow-y-auto">
+            <div className="bg-black text-white px-2.5 py-1 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
+              <span>Mention Member</span>
+              <span className="text-[10px] text-gray-300">{filteredMentions.length} matches</span>
+            </div>
             {filteredMentions.map((m, i) => (
               <div 
                 key={m.user_id}
-                className={`px-3 py-2 cursor-pointer font-bold border-b border-gray-200 last:border-0 ${i === mentionIndex ? 'bg-blue-200' : 'hover:bg-gray-100'}`}
+                className={`px-3 py-2 cursor-pointer font-bold border-b border-gray-200 last:border-0 flex items-center justify-between ${i === mentionIndex ? 'bg-blue-100' : 'hover:bg-gray-50'}`}
                 onMouseDown={(e) => { e.preventDefault(); insertMention(m.username); }}
               >
-                @{m.username}
-                <Badge className="ml-2 bg-black text-white text-[10px] h-4 py-0 px-1 border-none">BOT</Badge>
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-full border border-black overflow-hidden bg-gray-200 text-[10px] flex items-center justify-center shrink-0">
+                    {m.avatar_url ? (
+                      <img src={getAvatarUrl(m.avatar_url)} alt={m.username} className="w-full h-full object-cover" />
+                    ) : (
+                      m.username.charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  <span className="text-sm">@{m.username}</span>
+                </div>
+                <Badge className={`text-[9px] h-4 py-0 px-1 border-none shadow-none font-bold uppercase ${m.is_bot ? 'bg-black text-white' : 'bg-gray-200 text-black'}`}>
+                  {m.is_bot ? 'BOT' : 'USER'}
+                </Badge>
               </div>
             ))}
           </div>
@@ -420,26 +489,39 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
             value={inputMessage}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Type your message..."
+            placeholder="Type your message... (type @ to mention)"
             className="flex-1 bg-white h-12 text-base font-medium brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus-visible:ring-0 focus-visible:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus-visible:translate-x-[2px] focus-visible:translate-y-[2px] transition-all"
             disabled={!isConnected}
           />
           <Button 
             type="submit" 
             disabled={!isConnected || !inputMessage.trim()}
-            className="h-12 px-8 bg-[#c084fc] hover:bg-[#a855f7] text-white font-bold text-lg brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-[0px_0px_0px_0px_rgba(0,0,0,1)] active:translate-x-[4px] active:translate-y-[4px] transition-all"
+            className="h-12 px-8 bg-[#c084fc] hover:bg-[#a855f7] text-white font-bold text-lg brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-[0px_0px_0px_0px_rgba(0,0,0,1)] active:translate-x-[4px] active:translate-y-[4px] transition-all cursor-pointer"
           >
             SEND
           </Button>
         </form>
       </div>
+      </div>
+
+      {/* Right Column: Members List */}
+      <MembersList 
+        members={lobbyMembers} 
+        onMemberClick={handleOpenProfile} 
+        lobbyId={lobbyId}
+        currentUserId={user?.id}
+        currentUserRole={lobby?.owner_id === user?.id ? "OWNER" : (lobbyMembers.find(m => m.user_id === user?.id)?.role || "MEMBER")}
+        isLobbyOwner={lobby?.owner_id === user?.id}
+        onActionSuccess={refreshMembers}
+      />
     </div>
 
     <LobbySettingsDialog 
       lobby={lobby} 
       isOpen={settingsOpen} 
       onClose={() => setSettingsOpen(false)} 
-      myRole={lobby.owner_id === user?.id ? 'OWNER' : 'MEMBER'} // Todo: get real role from API, assuming OWNER if owner_id match
+      myRole={lobby.owner_id === user?.id ? 'OWNER' : 'MEMBER'}
+      currentUserId={user?.id}
       onUserProfileClick={handleOpenProfile}
       onLobbyUpdated={setLobby}
       onMembersUpdated={refreshMembers}

@@ -118,6 +118,23 @@ pub async fn join_lobby(
 
     // Private lobby logic
     if lobby.visibility != "PUBLIC" {
+        // Check if user has an APPROVED request or invite
+        let existing_status = sqlx::query_scalar::<_, String>(
+            "SELECT status FROM lobby_join_requests WHERE lobby_id = $1 AND user_id = $2"
+        )
+        .bind(lobby_id)
+        .bind(user_id)
+        .fetch_optional(&state.db)
+        .await?;
+
+        if let Some(status) = existing_status {
+            if status == "APPROVED" {
+                // User has approved invite/request, join immediately!
+                lobby_repository::add_member(&state.db, lobby_id, user_id, "MEMBER").await?;
+                return Ok(JoinResult::Joined);
+            }
+        }
+
         let provided_password = request.as_ref().and_then(|r| r.password.as_deref());
         
         // If password protected AND a password is provided
@@ -273,6 +290,87 @@ pub async fn reject_request(
         "JOIN_REQUEST_REJECTED",
         "İstek Reddedildi",
         &format!("{} lobisine katılma isteğiniz reddedildi.", lobby.name),
+        Some(lobby_id),
+    ).await;
+
+    Ok(())
+}
+
+pub async fn update_notification_preference(
+    state: &SharedState,
+    lobby_id: Uuid,
+    user_id: Uuid,
+    preference: &str,
+) -> Result<(), AppError> {
+    let is_member = lobby_repository::is_member(&state.db, lobby_id, user_id).await?;
+    if !is_member {
+        return Err(AppError::Forbidden("You are not a member of this lobby".to_string()));
+    }
+
+    lobby_repository::update_notification_preference(&state.db, lobby_id, user_id, preference).await?;
+    Ok(())
+}
+
+pub async fn invite_user(
+    state: &SharedState,
+    lobby_id: Uuid,
+    caller_id: Uuid,
+    username: Option<&str>,
+    user_id: Option<Uuid>,
+) -> Result<(), AppError> {
+    // 1. Verify caller has OWNER or MODERATOR role
+    let role = lobby_repository::get_member_role(&state.db, lobby_id, caller_id).await?;
+    match role.as_deref() {
+        Some(crate::schemas::lobby::ROLE_OWNER) | Some(crate::schemas::lobby::ROLE_MODERATOR) => {}
+        _ => return Err(AppError::Forbidden("Only moderators can invite users to this lobby".to_string())),
+    }
+
+    // 2. Resolve target user
+    let target_user = if let Some(uid) = user_id {
+        crate::repositories::user_repository::find_by_id(&state.db, uid).await?
+    } else if let Some(uname) = username {
+        crate::repositories::user_repository::find_by_username(&state.db, uname).await?
+    } else {
+        return Err(AppError::Validation("Either username or user_id must be provided".to_string()));
+    };
+
+    let target_user = target_user.ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
+
+    // 3. Check if target user is already banned
+    if crate::repositories::moderation_repository::get_ban(&state.db, lobby_id, target_user.id).await?.is_some() {
+        return Err(AppError::Forbidden("User is banned from this lobby".to_string()));
+    }
+
+    // 4. Check if already a member
+    if lobby_repository::is_member(&state.db, lobby_id, target_user.id).await? {
+        return Err(AppError::Conflict("User is already a member of this lobby".to_string()));
+    }
+
+    // 5. Pre-approve in lobby_join_requests
+    sqlx::query(
+        r#"
+        INSERT INTO lobby_join_requests (lobby_id, user_id, status)
+        VALUES ($1, $2, 'APPROVED')
+        ON CONFLICT (lobby_id, user_id) DO UPDATE SET status = 'APPROVED', updated_at = now()
+        "#
+    )
+    .bind(lobby_id)
+    .bind(target_user.id)
+    .execute(&state.db)
+    .await?;
+
+    // 6. Send notification to target user
+    let lobby = lobby_repository::find_by_id(&state.db, lobby_id).await?.ok_or_else(|| AppError::NotFound("Lobby not found".to_string()))?;
+    let caller = crate::repositories::user_repository::find_by_id(&state.db, caller_id).await?
+        .and_then(|u| u.display_name.or(Some(u.username)))
+        .unwrap_or_else(|| "A moderator".to_string());
+
+    let _ = crate::services::notification_service::create_notification(
+        state,
+        target_user.id,
+        "LOBBY_INVITE",
+        "Lobby Invitation",
+        &format!("{caller} invited you to join '{}'!", lobby.name),
         Some(lobby_id),
     ).await;
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Compass, User, LogOut, LogIn, UserPlus } from "lucide-react";
+import { getAvatarUrl } from "@/lib/avatar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,7 +44,15 @@ export function Header() {
                 <span className="hidden sm:inline">Rooms</span>
               </Link>
               <Link href="/profile" className="flex items-center gap-2 font-bold px-3 py-1.5 bg-[#4ADE80] brutal-border shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:shadow-[4px_4px_0_0_rgba(0,0,0,1)] rounded-md hover:-translate-y-1 transition-all text-black group cursor-pointer">
-                <User className="w-5 h-5" />
+                {user?.avatar_url ? (
+                  <img
+                    src={getAvatarUrl(user.avatar_url)}
+                    alt={user.username}
+                    className="w-6 h-6 rounded-full object-cover border border-black"
+                  />
+                ) : (
+                  <User className="w-5 h-5" />
+                )}
                 <span className="hidden md:inline">Hi, {user?.display_name || user?.username}</span>
               </Link>
             </div>

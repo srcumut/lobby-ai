@@ -1,0 +1,136 @@
+use chrono::{DateTime, Utc};
+use uuid::Uuid;
+
+use crate::errors::AppError;
+use crate::repositories::{direct_message_repository, user_repository};
+use crate::schemas::direct_message::DirectMessageResponse;
+use crate::schemas::ws_event::{WsOutgoingEvent, EVENT_DIRECT_MESSAGE_CREATED};
+use crate::services::notification_service;
+use crate::state::SharedState;
+
+pub async fn send_direct_message(
+    state: &SharedState,
+    sender_id: Uuid,
+    receiver_id: Uuid,
+    content: &str,
+) -> Result<DirectMessageResponse, AppError> {
+    let content = content.trim();
+    if content.is_empty() {
+        return Err(AppError::Validation("Message content cannot be empty.".to_string()));
+    }
+    if content.len() > 2000 {
+        return Err(AppError::Validation("Message cannot exceed 2000 characters.".to_string()));
+    }
+
+    if sender_id == receiver_id {
+        return Err(AppError::Validation("Cannot message yourself.".to_string()));
+    }
+
+    // Verify friendship
+    if !direct_message_repository::are_friends(&state.db, sender_id, receiver_id).await? {
+        return Err(AppError::Forbidden("You can only message accepted friends.".to_string()));
+    }
+
+    // Persist to database
+    let dm = direct_message_repository::create_direct_message(
+        &state.db,
+        sender_id,
+        receiver_id,
+        content,
+    )
+    .await?;
+
+    let response = DirectMessageResponse {
+        id: dm.id,
+        sender_id: dm.sender_id,
+        receiver_id: dm.receiver_id,
+        content: dm.content,
+        is_read: dm.is_read,
+        created_at: dm.created_at,
+    };
+
+    // Broadcast real-time direct message event via GlobalWsManager to receiver & sender
+    let event = WsOutgoingEvent {
+        event_type: EVENT_DIRECT_MESSAGE_CREATED.to_string(),
+        payload: serde_json::to_value(&response).unwrap_or_default(),
+    };
+
+    state.global_ws_manager.send_to_user(receiver_id, event.clone()).await;
+    state.global_ws_manager.send_to_user(sender_id, event).await;
+
+    // Send push notification to receiver
+    let sender_name = user_repository::find_by_id(&state.db, sender_id)
+        .await?
+        .and_then(|u| u.display_name.or(Some(u.username)))
+        .unwrap_or_else(|| "A friend".to_string());
+
+    let snippet = if content.chars().count() > 50 {
+        let truncated: String = content.chars().take(50).collect();
+        format!("{truncated}...")
+    } else {
+        content.to_string()
+    };
+
+    let _ = notification_service::create_notification(
+        state,
+        receiver_id,
+        "DIRECT_MESSAGE",
+        &format!("New message from {sender_name}"),
+        &snippet,
+        Some(sender_id),
+    )
+    .await;
+
+    Ok(response)
+}
+
+pub async fn get_conversation(
+    state: &SharedState,
+    current_user_id: Uuid,
+    friend_id: Uuid,
+    limit: i64,
+    before: Option<DateTime<Utc>>,
+) -> Result<Vec<DirectMessageResponse>, AppError> {
+    if current_user_id == friend_id {
+        return Err(AppError::Validation("Cannot message yourself.".to_string()));
+    }
+
+    // Verify friendship
+    if !direct_message_repository::are_friends(&state.db, current_user_id, friend_id).await? {
+        return Err(AppError::Forbidden("You can only view messages with accepted friends.".to_string()));
+    }
+
+    let limit = limit.clamp(1, 100);
+    let messages = direct_message_repository::get_conversation(
+        &state.db,
+        current_user_id,
+        friend_id,
+        limit,
+        before,
+    )
+    .await?;
+
+    // Mark messages from friend to current_user as read
+    let _ = direct_message_repository::mark_as_read(&state.db, current_user_id, friend_id).await;
+
+    let response = messages
+        .into_iter()
+        .map(|m| DirectMessageResponse {
+            id: m.id,
+            sender_id: m.sender_id,
+            receiver_id: m.receiver_id,
+            content: m.content,
+            is_read: m.is_read,
+            created_at: m.created_at,
+        })
+        .collect();
+
+    Ok(response)
+}
+
+pub async fn get_conversations(
+    state: &SharedState,
+    current_user_id: Uuid,
+) -> Result<Vec<crate::schemas::direct_message::ConversationResponse>, AppError> {
+    direct_message_repository::get_conversations(&state.db, current_user_id).await
+}

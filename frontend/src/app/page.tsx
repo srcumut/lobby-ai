@@ -7,26 +7,33 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { lobbiesApi } from "@/lib/api/lobbies";
+import { aiApi } from "@/lib/api/ai";
 import { Badge } from "@/components/ui/badge";
 import { UserProfileDialog } from "@/components/profile/UserProfileDialog";
-import { Crown, Sparkles, User, Settings } from "lucide-react";
+import { Crown, Sparkles, User, Settings, Bot, Clock } from "lucide-react";
+import { Agent, Lobby } from "@/types"; // Make sure Lobby type exists, or just use any
 
 export default function MainPage() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
-  const [ownedLobbies, setOwnedLobbies] = useState<Lobby[]>([]);
+  
+  const [publicLobbies, setPublicLobbies] = useState<any[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
   const [isFetching, setIsFetching] = useState(true);
   const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      lobbiesApi.getLobbies()
-        .then(data => {
-          const mine = data.filter(l => l.owner_id === user.id);
-          setOwnedLobbies(mine);
-        })
-        .catch(console.error)
-        .finally(() => setIsFetching(false));
+      Promise.all([
+        lobbiesApi.getLobbies().catch(() => []),
+        aiApi.getAgents().catch(() => [])
+      ]).then(([lobbiesData, agentsData]) => {
+        const publicOnly = lobbiesData.filter((l: any) => l.visibility === 'PUBLIC');
+        setPublicLobbies(publicOnly);
+        setAgents(agentsData);
+      }).finally(() => {
+        setIsFetching(false);
+      });
     }
   }, [isAuthenticated, user]);
 
@@ -41,91 +48,107 @@ export default function MainPage() {
   // --- Authenticated Dashboard ---
   if (isAuthenticated) {
     return (
-      <div className="flex-1 w-full max-w-6xl mx-auto space-y-10 flex flex-col pt-4 pb-12">
+      <div className="flex-1 w-full max-w-6xl mx-auto space-y-10 flex flex-col pt-2 pb-12">
         {/* Dashboard Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 p-6 sm:p-8 brutal-border brutal-shadow rounded-sm relative overflow-hidden animate-fade-in-up bg-[#FEF08A]">
-          {/* Animated Background */}
-          <div 
-            className="absolute inset-0 z-0 animate-breathe bg-gradient-to-br from-[#FEF08A] via-[#C084FC] to-[#581C87]"
-          />
+          <div className="absolute inset-0 z-0 animate-breathe bg-gradient-to-br from-[#FEF08A] via-[#C084FC] to-[#581C87]" />
+          
+          {/* Subtle neo-brutal system status badge */}
+          <div className="absolute top-3 right-3 z-10 hidden sm:flex items-center gap-2 bg-white/90 backdrop-blur-xs px-2.5 py-1 border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+            <span className="font-mono text-[10px] font-black tracking-wider uppercase text-black">NET::ACTIVE</span>
+            <span className="flex h-2 w-2 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#4ADE80]"></span>
+            </span>
+          </div>
+
           <div className="relative z-10 space-y-2">
+            <div className="inline-flex items-center gap-1.5 bg-black text-white px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider mb-1 shadow-[2px_2px_0_0_rgba(255,255,255,1)]">
+              <Sparkles className="w-3 h-3 text-[#FEF08A] animate-spin [animation-duration:6s]" /> REAL-TIME LOBBIES
+            </div>
             <h1 className="text-4xl sm:text-5xl font-black uppercase tracking-tighter">
               Welcome Back,
             </h1>
             <h2 className="text-3xl sm:text-4xl font-black bg-white inline-block px-4 py-1 brutal-border shadow-[4px_4px_0_0_rgba(0,0,0,1)]">
-              {user?.username}!
+              {user?.display_name || user?.username}!
             </h2>
-            <p className="text-lg font-bold mt-2 opacity-80 max-w-md">
-              Your dashboard overview. Jump back into active conversations or configure your upcoming AI agents.
-            </p>
           </div>
           <div className="relative z-10 flex flex-col gap-3 w-full md:w-auto">
-            <Button size="lg" className="bg-[#A78BFA] text-black hover:bg-[#8b5cf6] font-black w-full shadow-[4px_4px_0_0_rgba(0,0,0,1)]" onClick={() => router.push("/lobbies")}>
+            <Button size="lg" className="bg-[#A78BFA] text-black hover:bg-[#8b5cf6] font-black w-full shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_rgba(0,0,0,1)] transition-all cursor-pointer" onClick={() => router.push("/lobbies")}>
               BROWSE ALL LOBBIES
             </Button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Activity Area (2 cols) */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="flex items-center justify-between">
+          
+          {/* Main Content Area */}
+          <div className="lg:col-span-2 space-y-8">
+            
+            {/* Recently Visited (UI Skeleton for future endpoint) */}
+            <section className="space-y-4">
               <h3 className="text-2xl font-black uppercase tracking-tight flex items-center gap-2">
-                <span className="bg-[#FEF08A] p-1.5 rounded-sm brutal-border shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-black"><Crown className="w-6 h-6" /></span> 
-                Owned Rooms
+                <span className="bg-[#E0F4FF] p-1.5 rounded-sm brutal-border shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-black"><Clock className="w-5 h-5" /></span> 
+                Recently Visited Lobbies
               </h3>
-              <Link href="/lobbies" className="font-bold underline underline-offset-4 hover:text-[#A78BFA] transition-colors cursor-pointer">
-                View All
-              </Link>
-            </div>
-
-            {isFetching ? (
-              <div className="h-[400px] flex items-center justify-center brutal-border bg-white brutal-shadow">
-                <span className="font-bold animate-pulse text-xl">Loading rooms...</span>
+              <div className="bg-gray-100 border-2 border-dashed border-gray-400 p-6 flex flex-col items-center justify-center text-center">
+                <p className="font-bold text-gray-500">No recently visited lobbies available. (Feature Coming Soon)</p>
               </div>
-            ) : ownedLobbies.length > 0 ? (
-              <div className="h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-2">
-                  {ownedLobbies.map((lobby, index) => (
-                    <Card key={lobby.id} onClick={() => router.push(`/lobby/${lobby.id}`)} className={`cursor-pointer flex flex-col h-[180px] bg-white brutal-border brutal-shadow hover:-translate-y-2 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-300 animate-pop-in border-4`} style={{ animationDelay: `${(index + 1) * 100}ms` }}>
-                      <CardHeader className="pb-2 cursor-pointer">
-                        <div className="flex justify-between items-start gap-2">
-                          <CardTitle className="text-lg font-black line-clamp-1">{lobby.name}</CardTitle>
-                          <Badge variant={lobby.visibility === "PRIVATE" ? "destructive" : "default"} className="font-bold border-2 border-black whitespace-nowrap shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                            {lobby.visibility === "PRIVATE" ? "PRIVATE" : "PUBLIC"}
-                          </Badge>
-                        </div>
+            </section>
+
+            {/* Public Lobbies */}
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-2xl font-black uppercase tracking-tight flex items-center gap-2">
+                  <span className="bg-[#4ADE80] p-1.5 rounded-sm brutal-border shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-black"><Crown className="w-5 h-5" /></span> 
+                  Public Lobbies
+                </h3>
+                <Link href="/lobbies" className="font-bold underline underline-offset-4 hover:text-[#A78BFA] transition-colors cursor-pointer">
+                  View All
+                </Link>
+              </div>
+
+              {isFetching ? (
+                <div className="h-[200px] flex items-center justify-center brutal-border bg-white brutal-shadow">
+                  <span className="font-bold animate-pulse text-xl">Loading rooms...</span>
+                </div>
+              ) : publicLobbies.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {publicLobbies.slice(0, 4).map((lobby, index) => (
+                    <Card key={lobby.id} onClick={() => router.push(`/lobby/${lobby.id}`)} className="group cursor-pointer flex flex-col h-[160px] bg-white brutal-border brutal-shadow hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all border-2 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-[#4ADE80] scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-200" />
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg font-black line-clamp-1">{lobby.name}</CardTitle>
                         <CardDescription className="font-bold text-black/70 line-clamp-2 text-sm mt-1">
                           {lobby.description || "No description"}
                         </CardDescription>
                       </CardHeader>
-                      <CardContent className="mt-auto pb-4 cursor-pointer">
-                        <span className="text-xs font-black bg-[#E0F4FF] px-2 py-1 border-2 border-black rounded-sm inline-flex items-center gap-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                      <CardContent className="mt-auto pb-4">
+                        <span className="text-xs font-black bg-[#E0F4FF] group-hover:bg-[#FEF08A] px-2 py-1 border-2 border-black rounded-sm inline-flex items-center gap-1.5 transition-colors">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                          </span>
                           {lobby.member_count} Members
                         </span>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
-              </div>
-            ) : (
-              <div className="h-[400px] flex flex-col items-center justify-center brutal-border bg-white brutal-shadow text-center p-6 gap-4 border-4">
-                <p className="font-black text-2xl text-black/60">You don't own any rooms yet.</p>
-                <Button variant="outline" className="bg-[#4ADE80] font-black border-2 border-black shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:-translate-y-1 hover:shadow-[6px_6px_0_0_rgba(0,0,0,1)] transition-all text-black uppercase cursor-pointer" onClick={() => router.push("/lobbies")}>
-                  CREATE ONE
-                </Button>
-              </div>
-            )}
+              ) : (
+                <div className="bg-white p-6 border-2 brutal-border brutal-shadow text-center">
+                  <p className="font-bold text-gray-500">No public lobbies found.</p>
+                </div>
+              )}
+            </section>
+
           </div>
 
-          {/* Sidebar / Feature Area (1 col) */}
-          <div className="space-y-6 animate-fade-in-up delay-200">
-            <h3 className="text-2xl font-black uppercase tracking-tight flex items-center gap-2">
-              <span className="bg-white p-1.5 rounded-sm brutal-border shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">⚙️</span> Management
-            </h3>
+          {/* Right Sidebar Area (Profile & Agents) */}
+          <div className="space-y-6">
             
-            <Card className="bg-[#E0F4FF] brutal-border brutal-shadow border-4">
+            <Card className="bg-[#E0F4FF] brutal-border brutal-shadow border-4 relative overflow-hidden group">
+              <div className="absolute top-2 right-3 text-xs font-mono font-bold text-black/20 pointer-events-none select-none">+ +</div>
               <CardHeader className="pb-2">
                 <CardTitle className="font-black text-2xl flex items-center gap-2">
                   <User className="w-6 h-6" />
@@ -134,18 +157,21 @@ export default function MainPage() {
               </CardHeader>
               <CardContent className="space-y-4 font-bold mt-2">
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-[#A78BFA] border-4 border-black brutal-shadow-sm flex items-center justify-center text-2xl font-black text-white">
+                  <div className="w-16 h-16 rounded-full bg-[#A78BFA] border-4 border-black brutal-shadow-sm flex items-center justify-center text-2xl font-black text-white group-hover:scale-105 transition-transform">
                     {user?.username?.charAt(0).toUpperCase()}
                   </div>
                   <div>
                     <div className="text-xl font-black">{user?.display_name || user?.username}</div>
-                    <div className="text-sm font-bold text-black/60">@{user?.username}</div>
+                    <div className="text-sm font-bold text-black/60 flex items-center gap-1.5">
+                      <span>@{user?.username}</span>
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    </div>
                   </div>
                 </div>
-                <div className="flex justify-between border-b-4 border-black pb-2 pt-2">
-                  <span>Account Type:</span>
+                <div className="flex justify-between border-b-2 border-dashed border-gray-300 pb-2 pt-1 text-sm font-bold">
+                  <span className="text-gray-600">Account Type:</span>
                   <span className="font-black text-[#8b5cf6] flex items-center gap-1">
-                    {user?.is_bot ? <><Sparkles className="w-4 h-4"/> AI Agent</> : "Human"}
+                    {user?.is_bot ? <><Sparkles className="w-3.5 h-3.5"/> AI Agent</> : "Human"}
                   </span>
                 </div>
               </CardContent>
@@ -156,25 +182,42 @@ export default function MainPage() {
               </CardFooter>
             </Card>
             
-            <Card className="bg-[#F472B6] brutal-border brutal-shadow opacity-90 border-4">
-              <CardHeader>
-                <CardTitle className="font-black text-xl flex items-center gap-2">🤖 AI Agents</CardTitle>
-                <CardDescription className="font-bold text-black/70">
-                  Configure personal bot assistants.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="font-bold bg-white p-3 border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] mb-4 text-sm">
-                  Build and manage personalized AI agents to participate in your lobbies. Phase 3 is live!
-                </p>
-                <Button 
-                  className="w-full font-black bg-black text-white hover:bg-gray-800 border-2 border-black hover:-translate-y-1 hover:shadow-[4px_4px_0_0_rgba(0,0,0,1)] transition-all cursor-pointer shadow-[2px_2px_0_0_rgba(0,0,0,1)] uppercase" 
-                  onClick={() => router.push("/agents")}
-                >
-                  OPEN AI BUILDER
-                </Button>
-              </CardContent>
-            </Card>
+            <section className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
+                  <Bot className="w-5 h-5" /> Your Agents
+                </h3>
+                <Link href="/agents" className="font-bold underline underline-offset-4 text-sm hover:text-[#A78BFA] transition-colors">
+                  Manage
+                </Link>
+              </div>
+              
+              <div className="space-y-3">
+                {isFetching ? (
+                  <div className="text-sm font-bold text-gray-500">Loading agents...</div>
+                ) : agents.length > 0 ? (
+                  agents.slice(0, 3).map(agent => (
+                    <div key={agent.id} className="bg-white p-3 border-2 brutal-border shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex justify-between items-center hover:-translate-y-0.5 hover:shadow-[3px_3px_0_0_rgba(0,0,0,1)] transition-all group">
+                      <div>
+                        <div className="font-black text-sm">{agent.name}</div>
+                        <div className="text-xs font-bold text-gray-500">@{agent.name.toLowerCase().replace(/\s+/g, '_')}</div>
+                      </div>
+                      <Badge className="bg-[#F472B6] text-black border-2 border-black font-bold uppercase text-[10px] shadow-[1px_1px_0_0_rgba(0,0,0,1)] inline-flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-black/60 animate-pulse"></span>
+                        {agent.provider}
+                      </Badge>
+                    </div>
+                  ))
+                ) : (
+                  <div className="bg-[#F472B6] p-4 border-2 brutal-border shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                    <p className="font-bold text-sm text-black mb-3">You haven't built any active agents yet.</p>
+                    <Button className="w-full font-black bg-black text-white hover:bg-gray-800 border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] uppercase text-xs h-8" onClick={() => router.push("/agents")}>
+                      Create One
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </section>
 
           </div>
         </div>

@@ -52,8 +52,22 @@ pub struct LobbyMemberResponse {
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
     pub role: String,
+    pub notification_preference: Option<String>,
     pub is_bot: bool,
     pub joined_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateNotificationPreferenceRequest {
+    #[validate(custom(function = "validate_notification_preference"))]
+    pub preference: String, // "ALL", "MENTIONS_ONLY", "MUTE"
+}
+
+fn validate_notification_preference(pref: &str) -> Result<(), validator::ValidationError> {
+    match pref {
+        "ALL" | "MENTIONS_ONLY" | "MUTE" => Ok(()),
+        _ => Err(validator::ValidationError::new("invalid_preference")),
+    }
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
@@ -100,6 +114,12 @@ pub struct JoinRequestResponse {
 #[derive(Debug, Deserialize, Validate)]
 pub struct AddBotRequest {
     pub bot_user_id: Uuid,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct InviteUserRequest {
+    pub username: Option<String>,
+    pub user_id: Option<Uuid>,
 }
 
 

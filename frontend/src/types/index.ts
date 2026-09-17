@@ -31,6 +31,7 @@ export interface LobbyMember {
   display_name: string | null;
   avatar_url: string | null;
   role: string;
+  notification_preference?: string | null;
   is_bot: boolean;
   joined_at: string;
 }
@@ -44,6 +45,15 @@ export interface BannedUser {
   banned_by: string;
 }
 
+export interface JoinRequest {
+  lobby_id: string;
+  user_id: string;
+  username: string;
+  display_name: string | null;
+  status: string;
+  created_at: string;
+}
+
 export interface PublicUserProfile {
   id: string;
   username: string;
@@ -53,5 +63,21 @@ export interface PublicUserProfile {
   is_bot: boolean;
   created_at: string;
 }
-export * from './ai';  
- 
+
+export interface DirectMessage {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface Conversation {
+  friend: UserInfo;
+  last_message: DirectMessage | null;
+  unread_count: number;
+}
+
+export * from './ai';
+export * from './notifications';

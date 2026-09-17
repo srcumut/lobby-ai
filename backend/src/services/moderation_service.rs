@@ -21,13 +21,21 @@ async fn check_permission(
     let executor_role = lobby_repository::get_member_role(&state.db, lobby_id, executor_id).await?;
     let target_role = lobby_repository::get_member_role(&state.db, lobby_id, target_id).await?;
 
-    match (executor_role.as_deref(), target_role.as_deref()) {
-        (Some(ROLE_OWNER), _) => Ok(()), // Owner can moderate anyone
-        (Some(ROLE_MODERATOR), Some(ROLE_MEMBER)) => Ok(()), // Moderator can moderate members
-        (Some(ROLE_MODERATOR), _) => Err(AppError::Forbidden("Moderators cannot moderate owners or other moderators".to_string())),
-        (Some(ROLE_MEMBER), _) | (None, _) => Err(AppError::Forbidden("You do not have permission to moderate this lobby".to_string())),
-        _ => Err(AppError::Forbidden("Permission denied".to_string())),
+    let ex_role = executor_role.as_deref();
+    let tg_role = target_role.as_deref();
+
+    if ex_role == Some(ROLE_OWNER) {
+        return Ok(());
     }
+
+    if ex_role == Some(ROLE_MODERATOR) {
+        if tg_role == Some(ROLE_MEMBER) {
+            return Ok(());
+        }
+        return Err(AppError::Forbidden("Moderators cannot moderate owners or other moderators".to_string()));
+    }
+
+    Err(AppError::Forbidden("You do not have permission to moderate this lobby".to_string()))
 }
 
 pub async fn kick_user(

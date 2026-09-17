@@ -30,4 +30,8 @@ pub struct Agent {
     pub custom_instructions: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    #[sqlx(default)]
+    pub avatar_url: Option<String>,
+    #[sqlx(default)]
+    pub username: Option<String>,
 }

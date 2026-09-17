@@ -112,6 +112,23 @@ pub async fn reject_request(
     Ok(Json(serde_json::json!({ "message": "Request rejected" })))
 }
 
+pub async fn invite_user(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    Path(lobby_id): Path<Uuid>,
+    Json(payload): Json<crate::schemas::lobby::InviteUserRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    lobby_service::invite_user(
+        &state,
+        lobby_id,
+        auth.user_id,
+        payload.username.as_deref(),
+        payload.user_id,
+    )
+    .await?;
+    Ok(Json(serde_json::json!({ "message": "Invitation sent successfully" })))
+}
+
 pub async fn get_members(
     State(state): State<SharedState>,
     _auth: AuthenticatedUser,
@@ -167,4 +184,18 @@ pub async fn update_lobby(
         member_count,
         created_at: updated.created_at,
     }))
+}
+
+pub async fn update_notification_preference(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    axum::extract::Path(lobby_id): axum::extract::Path<Uuid>,
+    Json(payload): Json<crate::schemas::lobby::UpdateNotificationPreferenceRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    payload
+        .validate()
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    lobby_service::update_notification_preference(&state, lobby_id, auth.user_id, &payload.preference).await?;
+    Ok(Json(serde_json::json!({ "message": "Notification preference updated", "preference": payload.preference })))
 }

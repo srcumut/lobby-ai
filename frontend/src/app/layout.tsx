@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/hooks/useAuth";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
+import { AppShell } from "@/components/layout/AppShell";
 import { Toaster } from "@/components/ui/toast";
 
 const spaceGrotesk = Space_Grotesk({
@@ -28,11 +27,9 @@ export default function RootLayout({
     >
       <body className="h-full flex flex-col font-sans overflow-hidden">
         <AuthProvider>
-          <Header />
-          <main className="flex-1 flex flex-col gap-8 md:gap-12 p-4 md:p-8 min-h-0 overflow-y-auto overflow-x-hidden">
-            {children}
-            <Footer />
-          </main>
+          <div className="flex h-screen w-full bg-white text-black overflow-hidden relative">
+            <AppShell>{children}</AppShell>
+          </div>
           <Toaster />
         </AuthProvider>
       </body>

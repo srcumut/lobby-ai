@@ -70,7 +70,7 @@ pub async fn add_member(
         r#"
         INSERT INTO lobby_members (lobby_id, user_id, role)
         VALUES ($1, $2, $3)
-        RETURNING lobby_id, user_id, role, joined_at
+        RETURNING lobby_id, user_id, role, notification_preference, joined_at
         "#,
     )
     .bind(lobby_id)
@@ -130,7 +130,7 @@ pub async fn update_member_role(
         UPDATE lobby_members 
         SET role = $1
         WHERE lobby_id = $2 AND user_id = $3
-        RETURNING lobby_id, user_id, role, joined_at
+        RETURNING lobby_id, user_id, role, notification_preference, joined_at
         "#,
     )
     .bind(role)
@@ -140,6 +140,40 @@ pub async fn update_member_role(
     .await?;
 
     Ok(member)
+}
+
+pub async fn update_notification_preference(
+    pool: &PgPool,
+    lobby_id: Uuid,
+    user_id: Uuid,
+    preference: &str,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE lobby_members SET notification_preference = $1 WHERE lobby_id = $2 AND user_id = $3"
+    )
+    .bind(preference)
+    .bind(lobby_id)
+    .bind(user_id)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn get_member_notification_preference(
+    pool: &PgPool,
+    lobby_id: Uuid,
+    user_id: Uuid,
+) -> Result<Option<String>, AppError> {
+    let row: Option<(String,)> = sqlx::query_as(
+        "SELECT notification_preference FROM lobby_members WHERE lobby_id = $1 AND user_id = $2"
+    )
+    .bind(lobby_id)
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(row.map(|r| r.0))
 }
 
 pub async fn get_members(
@@ -154,6 +188,7 @@ pub async fn get_members(
             u.display_name, 
             u.avatar_url, 
             m.role, 
+            m.notification_preference,
             u.is_bot,
             m.joined_at
         FROM lobby_members m
