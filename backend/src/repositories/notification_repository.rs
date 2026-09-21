@@ -33,37 +33,55 @@ pub async fn create_notification(
 pub async fn get_user_notifications(
     pool: &PgPool,
     user_id: Uuid,
+    include_all: bool,
 ) -> Result<Vec<Notification>, AppError> {
-    let notifications = sqlx::query_as::<_, Notification>(
-        r#"
-        SELECT id, user_id, type, title, message, related_entity_id, is_read, created_at
-        FROM notifications
-        WHERE user_id = $1
-        ORDER BY created_at DESC
-        LIMIT 100
-        "#,
-    )
-    .bind(user_id)
-    .fetch_all(pool)
-    .await?;
+    if include_all {
+        let notifications = sqlx::query_as::<_, Notification>(
+            r#"
+            SELECT id, user_id, type, title, message, related_entity_id, is_read, created_at
+            FROM notifications
+            WHERE user_id = $1
+            ORDER BY created_at DESC
+            LIMIT 100
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(pool)
+        .await?;
 
-    Ok(notifications)
+        Ok(notifications)
+    } else {
+        let notifications = sqlx::query_as::<_, Notification>(
+            r#"
+            SELECT id, user_id, type, title, message, related_entity_id, is_read, created_at
+            FROM notifications
+            WHERE user_id = $1 AND created_at >= NOW() - INTERVAL '24 hours'
+            ORDER BY created_at DESC
+            LIMIT 100
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(notifications)
+    }
 }
 
 pub async fn mark_as_read(
     pool: &PgPool,
     id: Uuid,
     user_id: Uuid,
-) -> Result<bool, AppError> {
-    let result = sqlx::query(
-        "UPDATE notifications SET is_read = true WHERE id = $1 AND user_id = $2"
+) -> Result<Option<Notification>, AppError> {
+    let notification = sqlx::query_as::<_, Notification>(
+        "UPDATE notifications SET is_read = true WHERE id = $1 AND user_id = $2 RETURNING id, user_id, type, title, message, related_entity_id, is_read, created_at"
     )
     .bind(id)
     .bind(user_id)
-    .execute(pool)
+    .fetch_optional(pool)
     .await?;
 
-    Ok(result.rows_affected() > 0)
+    Ok(notification)
 }
 
 pub async fn mark_all_as_read(

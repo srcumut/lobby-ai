@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useEffect, useState, useRef, use } from "react";
+import { useEffect, useState, useRef, use, useCallback } from "react";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,11 +22,24 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Ban, UserMinus, MicOff, Mic, Settings, Bot } from "lucide-react";
+import { MoreVertical, Ban, UserMinus, MicOff, Mic, Settings, Bot, Gamepad2, Swords, Dices, Coins, Sparkles, BarChart2 } from "lucide-react";
 import { LobbySettingsDialog } from "@/components/lobby/LobbySettingsDialog";
 import { UserProfileDialog } from "@/components/profile/UserProfileDialog";
 import { MembersList } from "@/components/lobby/MembersList";
+import { TypingIndicator } from "@/components/chat/TypingIndicator";
+import { LobbyTrivia } from "@/components/lobby/LobbyTrivia";
+import { LobbyRpsDuel } from "@/components/lobby/LobbyRpsDuel";
+import { LobbyActivityMenu } from "@/components/lobby/LobbyActivityMenu";
+import { RichGameCard, isRichGameMessage } from "@/components/chat/RichGameCard";
+import { getRandomIcebreaker } from "@/lib/icebreakers";
+import { CreatePollModal } from "@/components/lobby/CreatePollModal";
+import { LobbyPollCard } from "@/components/lobby/LobbyPollCard";
+import { LobbyPollsDialog } from "@/components/lobby/LobbyPollsDialog";
+import { pollsApi, Poll } from "@/lib/api/polls";
 import { getAvatarUrl } from "@/lib/avatar";
+import { toast } from "@/components/ui/toast";
+
+
 
 export default function LobbyChatPage({ params }: { params: Promise<{ id: string }> }) {
   // Use React.use to unwrap params in Next.js 15+
@@ -58,8 +71,230 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
     setProfileOpen(true);
   };
 
-  // WebSocket hook
-  const { isConnected, error: wsError, lastMessage, sendMessage } = useWebSocket(lobbyId);
+  const [isMemberVerified, setIsMemberVerified] = useState(false);
+
+  // Role detection
+  const myLobbyMember = lobbyMembers.find((m) => m.user_id === user?.id);
+  const myRole = lobby?.owner_id === user?.id ? "OWNER" : (myLobbyMember?.role || "MEMBER");
+  const canModerate = myRole === "OWNER" || myRole === "MODERATOR";
+
+  // Party Game States
+  const [triviaActive, setTriviaActive] = useState(false);
+  const [incomingGameEvent, setIncomingGameEvent] = useState<{
+    sender_id: string;
+    sender_username: string;
+    data?: any;
+  } | null>(null);
+
+
+  const [rpsDuelState, setRpsDuelState] = useState<{
+    isOpen: boolean;
+    opponentId: string;
+    opponentUsername: string;
+    isInitiator: boolean;
+    opponentIsBot?: boolean;
+  }>({
+    isOpen: false,
+    opponentId: "",
+    opponentUsername: "",
+    isInitiator: false,
+    opponentIsBot: false,
+  });
+
+  const [pendingRpsChallenge, setPendingRpsChallenge] = useState<{
+    fromUserId: string;
+    fromUsername: string;
+  } | null>(null);
+
+  // Poll States
+  const [polls, setPolls] = useState<Poll[]>([]);
+  const [createPollOpen, setCreatePollOpen] = useState(false);
+  const [pollsDialogOpen, setPollsDialogOpen] = useState(false);
+  const [isPollsBannerDismissed, setIsPollsBannerDismissed] = useState(false);
+  const [isPollCollapsed, setIsPollCollapsed] = useState(false);
+
+
+  // Typing state refs
+  const lastTypingSentRef = useRef<number>(0);
+  const stopTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // WebSocket hook - only connects once membership is verified
+  const handleIncomingWsEvent = useCallback((event: WsIncomingEvent) => {
+
+    if (event.type === "message.created") {
+      const newMsg = event.payload as MessageResponse;
+      setMessages((prev) => {
+        // If an optimistic temp message exists matching content and sender, replace it
+        const tempIndex = prev.findIndex(
+          (m) => m.id.startsWith("temp-") && m.sender.id === newMsg.sender.id && m.content === newMsg.content
+        );
+        if (tempIndex !== -1) {
+          const next = [...prev];
+          next[tempIndex] = newMsg;
+          return next;
+        }
+        if (prev.some((m) => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
+    } else if (event.type === "user.joined") {
+      const payload = event.payload as { user?: { username?: string; id?: string } } | undefined;
+      const username = payload?.user?.username || "Bir kullanıcı";
+      if (payload?.user?.id !== user?.id) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `sys-${Date.now()}-${Math.random()}`,
+            lobby_id: lobbyId,
+            sender: { id: "system", username: "Sistem", display_name: null, avatar_url: null },
+            content: `${username} odaya katıldı.`,
+            is_bot: true,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      }
+    } else if (event.type === "user.left") {
+      const payload = event.payload as { user?: { username?: string; id?: string } } | undefined;
+      const username = payload?.user?.username || "Bir kullanıcı";
+      if (payload?.user?.id !== user?.id) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `sys-${Date.now()}-${Math.random()}`,
+            lobby_id: lobbyId,
+            sender: { id: "system", username: "Sistem", display_name: null, avatar_url: null },
+            content: `${username} odadan ayrıldı.`,
+            is_bot: true,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      }
+    } else if (event.type === "moderation.event") {
+      const { action, target_user_id, duration_minutes } =
+        (event.payload as { action?: string; target_user_id?: string; duration_minutes?: number } || {});
+
+      if (target_user_id === user?.id) {
+        if (action === "kick" || action === "ban") {
+          toast.add({
+            title: action === "kick" ? "Lobiden Atıldınız" : "Lobiden Yasaklandınız",
+            description: action === "kick" ? "Lobi yöneticisi sizi bu lobiden çıkardı." : "Lobi yöneticisi sizi bu lobiden yasakladı.",
+            type: "error",
+          });
+          router.push("/lobbies");
+          return;
+        } else if (action === "mute") {
+          const durationStr = duration_minutes ? `${duration_minutes} dakika` : "süresiz olarak";
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `sys-${Date.now()}`,
+              lobby_id: lobbyId,
+              sender: { id: "system", username: "Sistem", display_name: null, avatar_url: null },
+              content: `Moderatörler tarafından ${durationStr} susturuldunuz.`,
+              is_bot: true,
+              created_at: new Date().toISOString(),
+            },
+          ]);
+        } else if (action === "unmute") {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `sys-${Date.now()}`,
+              lobby_id: lobbyId,
+              sender: { id: "system", username: "Sistem", display_name: null, avatar_url: null },
+              content: `Susturmanız kaldırıldı, artık mesaj yazabilirsiniz.`,
+              is_bot: true,
+              created_at: new Date().toISOString(),
+            },
+          ]);
+        }
+      } else {
+        // Someone else was moderated
+        setMessages((prev) => {
+          const prevMsg = prev.find((m) => m.sender.id === target_user_id);
+          const username = prevMsg ? prevMsg.sender.username : "Bir kullanıcı";
+
+          let sysContent = "";
+          if (action === "kick") sysContent = `${username} lobiden atıldı.`;
+          if (action === "ban") sysContent = `${username} lobiden yasaklandı.`;
+          if (action === "mute") sysContent = `${username} susturuldu.`;
+          if (action === "unmute") sysContent = `${username} susturması kaldırıldı.`;
+
+          if (!sysContent) return prev;
+
+          return [
+            ...prev,
+            {
+              id: `sys-${Date.now()}`,
+              lobby_id: lobbyId,
+              sender: { id: "system", username: "Sistem", display_name: null, avatar_url: null },
+              content: sysContent,
+              is_bot: true,
+              created_at: new Date().toISOString(),
+            },
+          ];
+        });
+      }
+    } else if (event.type === "game.event") {
+      const payload = event.payload as {
+        sender_id: string;
+        sender_username: string;
+        data: any;
+      };
+      setIncomingGameEvent(payload);
+
+      const actionData = payload?.data;
+      if (actionData.type === "trivia_session_start") {
+        setTriviaActive(true);
+      } else if (actionData.gameType === "rps" && actionData.type === "rps_challenge" && actionData.targetId === user?.id) {
+        toast.add({
+          title: "✊ Taş-Kağıt-Makas Meydan Okuma!",
+          description: `${payload.sender_username} seninle Taş-Kağıt-Makas oynamak istiyor!`,
+          type: "info",
+        });
+        setPendingRpsChallenge({
+          fromUserId: payload.sender_id,
+          fromUsername: payload.sender_username,
+        });
+      } else if (actionData.gameType === "rps" && actionData.type === "rps_accept" && actionData.targetId === user?.id) {
+        setRpsDuelState({
+          isOpen: true,
+          opponentId: payload.sender_id,
+          opponentUsername: payload.sender_username,
+          isInitiator: true,
+          opponentIsBot: false,
+        });
+        setPendingRpsChallenge(null);
+      } else if (actionData.gameType === "rps" && actionData.type === "rps_decline" && actionData.targetId === user?.id) {
+        toast.add({
+          title: "Meydan Okuma Reddedildi",
+          description: `${payload.sender_username} Taş-Kağıt-Makas düellosunu reddetti.`,
+          type: "info",
+        });
+      }
+    } else if (event.type === "poll.created") {
+      const newPoll = event.payload as Poll;
+      if (newPoll && newPoll.id) {
+        setPolls((prev) => [newPoll, ...prev.filter((p) => p.id !== newPoll.id)]);
+      }
+    } else if (event.type === "poll.updated") {
+      const updatedPoll = event.payload as Poll;
+      if (updatedPoll && updatedPoll.id) {
+        setPolls((prev) => prev.map((p) => (p.id === updatedPoll.id ? updatedPoll : p)));
+      }
+    }
+  }, [user?.id, lobbyId, router]);
+
+
+  const {
+    isConnected,
+    error: wsError,
+    sendMessage,
+    sendTyping,
+    sendGameAction,
+    typingUsers,
+    setTypingUsers,
+  } = useWebSocket(lobbyId, isMemberVerified, handleIncomingWsEvent);
+
 
   // Fetch initial data
   useEffect(() => {
@@ -69,24 +304,76 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
     
     const loadData = async () => {
       try {
-        const [lobbyData, messagesData, membersData] = await Promise.all([
+        // Step 1: Load lobby details and members first
+        const [lobbyData, initialMembers] = await Promise.all([
           lobbiesApi.getLobbyById(lobbyId),
-          lobbiesApi.getMessages(lobbyId),
-          lobbiesApi.getMembers(lobbyId)
+          lobbiesApi.getMembers(lobbyId),
         ]);
+
+        let currentMembers = initialMembers;
+        const isMember = currentMembers.some((m) => m.user_id === user?.id) || lobbyData.owner_id === user?.id;
+
+        // Step 2: If user is not yet recorded as a member, automatically attempt to join.
+        // This succeeds immediately for users with an APPROVED invitation/request or in public lobbies!
+        if (!isMember) {
+          try {
+            await lobbiesApi.joinLobby(lobbyId, {});
+            // Re-fetch members to include the newly joined user
+            currentMembers = await lobbiesApi.getMembers(lobbyId);
+          } catch (joinErr: any) {
+            // If already a member (409 conflict), proceed
+            if (joinErr.response?.status !== 409) {
+              throw joinErr;
+            }
+          }
+        }
+
+        setIsMemberVerified(true);
         setLobby(lobbyData);
-        setLobbyMembers(membersData);
+        setLobbyMembers(currentMembers);
+
+        // Step 3: Now that membership is active, load messages safely
+        const messagesData = await lobbiesApi.getMessages(lobbyId);
         // Backend might return messages descending (newest first). Let's reverse to show oldest first at top
         setMessages(messagesData.reverse());
+
+        // Step 4: Load polls for this lobby
+        try {
+          const pollsData = await pollsApi.getPolls(lobbyId);
+          setPolls(pollsData);
+        } catch (e) {
+          console.error("Failed to load polls:", e);
+        }
+
+        // Save to recently visited lobbies in localStorage
+
+        try {
+          const RECENT_KEY = "lobby-ai:recent-lobbies";
+          const raw = localStorage.getItem(RECENT_KEY);
+          const currentList = raw ? JSON.parse(raw) : [];
+          const updatedList = [
+            {
+              id: lobbyData.id,
+              name: lobbyData.name,
+              description: lobbyData.description,
+              member_count: lobbyData.member_count,
+              visitedAt: Date.now(),
+            },
+            ...currentList.filter((item: any) => item.id !== lobbyData.id),
+          ].slice(0, 8);
+          localStorage.setItem(RECENT_KEY, JSON.stringify(updatedList));
+        } catch (e) {
+          console.error("Failed to record recent lobby:", e);
+        }
       } catch (err: any) {
-        setError(err.response?.data?.error?.message || "Failed to load lobby");
+        setError(err.response?.data?.error?.message || "Lobi yüklenemedi");
       } finally {
         setIsLoading(false);
       }
     };
     
     loadData();
-  }, [lobbyId, isAuthenticated]);
+  }, [lobbyId, isAuthenticated, user?.id]);
 
   // Handle incoming WS events
   const refreshMembers = async () => {
@@ -98,96 +385,25 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
     }
   };
 
+  // Keep members and roles fresh on tab focus and periodic interval
   useEffect(() => {
-    if (!lastMessage) return;
+    if (!isAuthenticated || !lobbyId) return;
 
-    if (lastMessage.type === "message.created") {
-      const newMsg = lastMessage.payload as MessageResponse;
-      // Add to messages if not already present (checking ID just in case)
-      setMessages((prev) => {
-        if (prev.some(m => m.id === newMsg.id)) return prev;
-        return [...prev, newMsg];
-      });
-    } else if (lastMessage.type === "user.joined") {
-      const payload = lastMessage.payload;
-      const username = payload.user?.username || "A user";
-      if (payload.user?.id !== user?.id) {
-        setMessages(prev => [...prev, {
-          id: `sys-${Date.now()}-${Math.random()}`,
-          lobby_id: lobbyId,
-          sender: { id: "system", username: "System", display_name: null, avatar_url: null },
-          content: `${username} joined the room.`,
-          is_bot: true,
-          created_at: new Date().toISOString(),
-        }]);
-      }
-    } else if (lastMessage.type === "user.left") {
-      const payload = lastMessage.payload;
-      const username = payload.user?.username || "A user";
-      if (payload.user?.id !== user?.id) {
-        setMessages(prev => [...prev, {
-          id: `sys-${Date.now()}-${Math.random()}`,
-          lobby_id: lobbyId,
-          sender: { id: "system", username: "System", display_name: null, avatar_url: null },
-          content: `${username} left the room.`,
-          is_bot: true,
-          created_at: new Date().toISOString(),
-        }]);
-      }
-    } else if (lastMessage.type === "moderation.event") {
-      const { action, target_user_id, duration_minutes } = lastMessage.payload;
-      
-      if (target_user_id === user?.id) {
-        if (action === 'kick' || action === 'ban') {
-          alert(action === 'kick' ? "You have been kicked from the lobby!" : "You have been banned from the lobby!");
-          router.push("/lobbies");
-          return;
-        } else if (action === 'mute') {
-          const durationStr = duration_minutes ? `${duration_minutes} minutes` : "indefinitely";
-          setMessages(prev => [...prev, {
-            id: `sys-${Date.now()}`,
-            lobby_id: lobbyId,
-            sender: { id: "system", username: "System", display_name: null, avatar_url: null },
-            content: `You have been muted by moderators for ${durationStr}.`,
-            is_bot: true,
-            created_at: new Date().toISOString(),
-          }]);
-        } else if (action === 'unmute') {
-          setMessages(prev => [...prev, {
-            id: `sys-${Date.now()}`,
-            lobby_id: lobbyId,
-            sender: { id: "system", username: "System", display_name: null, avatar_url: null },
-            content: `You have been unmuted, you can speak now.`,
-            is_bot: true,
-            created_at: new Date().toISOString(),
-          }]);
-        }
-      } else {
-        // Someone else was moderated
-        setMessages(prev => {
-          const prevMsg = prev.find(m => m.sender.id === target_user_id);
-          const username = prevMsg ? prevMsg.sender.username : "A user";
-          
-          let sysContent = "";
-          if (action === 'kick') sysContent = `${username} was kicked.`;
-          if (action === 'ban') sysContent = `${username} was banned.`;
-          if (action === 'mute') sysContent = `${username} was muted.`;
-          if (action === 'unmute') sysContent = `${username} was unmuted.`;
-          
-          if (!sysContent) return prev;
-          
-          return [...prev, {
-            id: `sys-${Date.now()}`,
-            lobby_id: lobbyId,
-            sender: { id: "system", username: "System", display_name: null, avatar_url: null },
-            content: sysContent,
-            is_bot: true,
-            created_at: new Date().toISOString(),
-          }];
-        });
-      }
-    }
-  }, [lastMessage, user?.id, lobbyId, router]);
+    const onFocus = () => {
+      refreshMembers();
+    };
+
+    window.addEventListener("focus", onFocus);
+
+    const interval = setInterval(() => {
+      refreshMembers();
+    }, 10000);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      clearInterval(interval);
+    };
+  }, [isAuthenticated, lobbyId]);
 
   // Auto-scroll messages container to bottom without scrolling ancestors
   useEffect(() => {
@@ -198,9 +414,46 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputMessage.trim() || !isConnected) return;
+    const content = inputMessage.trim();
+    if (!content || !isConnected || !user) return;
     
-    sendMessage(inputMessage);
+    if (stopTypingTimeoutRef.current) {
+      clearTimeout(stopTypingTimeoutRef.current);
+    }
+    sendTyping(false);
+
+    if (content === "/trivia") {
+      setTriviaActive(true);
+      setInputMessage("");
+      return;
+    }
+
+    if (content === "/anket" || content === "/poll") {
+      setCreatePollOpen(true);
+      setInputMessage("");
+      return;
+    }
+
+
+
+    // Optimistically add user's message immediately so it's always rendered right away
+    const tempId = `temp-${Date.now()}-${Math.random()}`;
+    const optimisticMsg: MessageResponse = {
+      id: tempId,
+      lobby_id: lobbyId,
+      sender: {
+        id: user.id,
+        username: user.username,
+        display_name: user.display_name || null,
+        avatar_url: user.avatar_url || null,
+      },
+      content,
+      is_bot: false,
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimisticMsg]);
+
+    sendMessage(content);
     setInputMessage("");
     setMentionQuery(null);
   };
@@ -208,6 +461,22 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setInputMessage(val);
+
+    if (val.trim()) {
+      const now = Date.now();
+      if (now - lastTypingSentRef.current > 2000) {
+        sendTyping(true);
+        lastTypingSentRef.current = now;
+      }
+      if (stopTypingTimeoutRef.current) {
+        clearTimeout(stopTypingTimeoutRef.current);
+      }
+      stopTypingTimeoutRef.current = setTimeout(() => {
+        sendTyping(false);
+      }, 2500);
+    } else {
+      sendTyping(false);
+    }
 
     const cursor = e.target.selectionStart;
     if (cursor === null) return;
@@ -254,17 +523,157 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
     setMentionQuery(null);
   };
 
-  const handleModeration = async (action: 'kick' | 'mute' | 'unmute' | 'ban', targetUserId: string, durationMinutes?: number) => {
+  const handleModeration = async (action: 'kick' | 'mute' | 'unmute' | 'ban', targetUserId: string, durationMinutes?: number | null) => {
     try {
       await lobbiesApi.moderateUser(lobbyId, action, targetUserId, durationMinutes);
-      alert(`User has been ${action}ed successfully.`);
+      const actionLabels: Record<string, string> = {
+        kick: "Lobiden atıldı",
+        ban: "Lobiden yasaklandı",
+        mute: "Susturuldu",
+        unmute: "Susturması kaldırıldı",
+      };
+      toast.add({
+        title: "İşlem Başarılı",
+        description: `Kullanıcı başarıyla ${actionLabels[action] || action}.`,
+        type: "success",
+      });
     } catch (e: any) {
       console.error("Moderation error:", e.response?.data || e);
-      alert(`Failed to ${action} user: ${e.response?.data?.error?.message || "Unknown error"}`);
+      toast.add({
+        title: "İşlem Başarısız",
+        description: e.response?.data?.error?.message || "Moderasyon işlemi uygulanamadı.",
+        type: "error",
+      });
+    }
+  };
+
+
+  const handleChallengeRps = (targetId: string, targetUsername: string, isBot?: boolean) => {
+    if (!isConnected || !user) return;
+    if (isBot) {
+      setRpsDuelState({
+        isOpen: true,
+        opponentId: targetId,
+        opponentUsername: targetUsername,
+        isInitiator: true,
+        opponentIsBot: true,
+      });
+      sendMessage(`✊ @${targetUsername} ile Taş-Kağıt-Makas düellosu başlattım! 🤖`);
+      return;
+    }
+    sendGameAction({
+      gameType: "rps",
+      type: "rps_challenge",
+      targetId,
+    });
+    toast.add({
+      title: "Taş-Kağıt-Makas Meydan Okuması",
+      description: `${targetUsername} kullanıcısına meydan okuma gönderildi.`,
+      type: "info",
+    });
+  };
+
+  const handleAcceptRpsChallenge = () => {
+    if (!pendingRpsChallenge || !user) return;
+    sendGameAction({
+      gameType: "rps",
+      type: "rps_accept",
+      targetId: pendingRpsChallenge.fromUserId,
+    });
+    setRpsDuelState({
+      isOpen: true,
+      opponentId: pendingRpsChallenge.fromUserId,
+      opponentUsername: pendingRpsChallenge.fromUsername,
+      isInitiator: false,
+      opponentIsBot: false,
+    });
+    setPendingRpsChallenge(null);
+  };
+
+  const handleDeclineRpsChallenge = () => {
+    if (!pendingRpsChallenge) return;
+    sendGameAction({
+      gameType: "rps",
+      type: "rps_decline",
+      targetId: pendingRpsChallenge.fromUserId,
+    });
+    setPendingRpsChallenge(null);
+  };
+
+  // Handle global accept event dispatched from RichGameCard challenge box
+  useEffect(() => {
+    const handleRpsGlobalAccept = (e: Event) => {
+      const customEvent = e as CustomEvent<{ challengerUsername: string }>;
+      const challengerUsername = customEvent.detail?.challengerUsername;
+      if (!challengerUsername || !user) return;
+
+      const challenger = lobbyMembers.find(
+        (m) => m.username.toLowerCase() === challengerUsername.toLowerCase()
+      );
+      if (!challenger || challenger.user_id === user.id) return;
+
+      setRpsDuelState({
+        isOpen: true,
+        opponentId: challenger.user_id,
+        opponentUsername: challenger.username,
+        opponentIsBot: challenger.is_bot,
+        isInitiator: false,
+      });
+
+      sendGameAction({
+        gameType: "rps",
+        type: "rps_accept",
+        targetId: challenger.user_id,
+      });
+
+      sendMessage(`⚔️ @${user.username}, @${challenger.username} tarafından açılan Taş-Kağıt-Makas meydan okumasını kabul etti!`);
+    };
+
+    window.addEventListener("lobby:rps_accept_challenge", handleRpsGlobalAccept);
+    return () => {
+      window.removeEventListener("lobby:rps_accept_challenge", handleRpsGlobalAccept);
+    };
+  }, [lobbyMembers, user, sendGameAction, sendMessage]);
+
+  const handleDropIcebreaker = () => {
+    const q = getRandomIcebreaker();
+    sendMessage(`❄️ [GÜNÜN TARTIŞMA SORUSU]: ${q}`);
+  };
+
+  const handleVotePoll = async (pollId: string, optionId: string) => {
+    try {
+      const updated = await pollsApi.votePoll(lobbyId, pollId, optionId);
+      setPolls((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+    } catch (err: any) {
+      toast.add({
+        title: "Hata",
+        description: err.response?.data?.error?.message || "Oy verilemedi.",
+        type: "error",
+      });
+    }
+  };
+
+  const handleClosePoll = async (pollId: string) => {
+    try {
+      const updated = await pollsApi.closePoll(lobbyId, pollId);
+      setPolls((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      toast.add({
+        title: "Anket Sonlandırıldı",
+        description: "Anket başarıyla kapatıldı.",
+        type: "success",
+      });
+    } catch (err: any) {
+      toast.add({
+        title: "Hata",
+        description: err.response?.data?.error?.message || "Anket kapatılamadı.",
+        type: "error",
+      });
     }
   };
 
   const renderMessageContent = (content: string, currentUsername?: string) => {
+
+
     const parts = content.split(/(@[a-zA-Z0-9_]+)/g);
     return parts.map((part, index) => {
       if (part.startsWith("@") && part.length > 1) {
@@ -287,10 +696,14 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
     });
   };
 
+  const activePollsCount = polls.filter((p) => !p.is_closed).length;
+  const latestActivePoll = polls.find((p) => !p.is_closed);
+
   if (isLoading) {
+
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-xl font-bold animate-pulse">Loading lobby...</div>
+        <div className="text-xl font-bold animate-pulse">Lobi yükleniyor...</div>
       </div>
     );
   }
@@ -299,45 +712,191 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4">
         <div className="bg-destructive/20 text-destructive brutal-border p-6 rounded-sm max-w-md w-full text-center">
-          <h2 className="text-2xl font-bold mb-2">Error</h2>
-          <p className="font-medium">{error || "Lobby not found"}</p>
+          <h2 className="text-2xl font-bold mb-2">Hata</h2>
+          <p className="font-medium">{error || "Lobi bulunamadı"}</p>
         </div>
-        <Button onClick={() => router.push("/lobbies")}>Back to Lobbies</Button>
+        <Button onClick={() => router.push("/lobbies")}>Odalara Dön</Button>
       </div>
     );
   }
 
   return (
     <ProtectedRoute>
-    <div className="flex h-full min-h-0 w-full bg-[#f8fafc] border-4 border-black brutal-shadow rounded-sm overflow-hidden">
+    <div className="flex h-full min-h-0 w-full bg-[#f8fafc] border-4 border-black brutal-shadow rounded-sm overflow-hidden animate-fade-in">
       
       {/* Center Column: Chat Area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-[#f4f4f5] h-full">
       {/* Header */}
-      <div className="bg-[#FFE4E6] border-b-4 border-black p-4 flex justify-between items-center z-10 shrink-0">
+      <div className="bg-gradient-to-r from-[#FEF08A] via-[#FFEDD5] to-[#FCE7F3] border-b-4 border-black p-4 flex justify-between items-center z-10 shrink-0">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-bold">{lobby.name}</h1>
-            <Badge variant={lobby.visibility === "PRIVATE" ? "destructive" : "default"} className="bg-black text-white border-black">
-              {lobby.visibility}
+            <h1 className="text-2xl font-black tracking-tight text-black">{lobby.name}</h1>
+            <Badge variant={lobby.visibility === "PRIVATE" ? "destructive" : "default"} className="bg-black text-white border-black font-bold">
+              {lobby.visibility === "PRIVATE" ? "ÖZEL" : "HERKESE AÇIK"}
             </Badge>
             {isConnected ? (
-              <Badge className="bg-[#4ade80] text-black">Live</Badge>
+              <Badge className="bg-[#4ade80] text-black font-black">Canlı</Badge>
+            ) : isMemberVerified ? (
+              <Badge variant="destructive" className="font-bold animate-pulse">Bağlantı kuruluyor...</Badge>
             ) : (
-              <Badge variant="destructive">Reconnecting...</Badge>
+              <Badge variant="outline" className="font-bold bg-[#FEF08A] text-black border-black animate-pulse">Odaya giriliyor...</Badge>
             )}
           </div>
-          <p className="text-sm font-medium opacity-80">{lobby.description || "No description"}</p>
+          <p className="text-sm font-bold text-black/75">{lobby.description || "Açıklama bulunmuyor"}</p>
         </div>
-        <div>
-          <Button variant="outline" className="bg-white text-black border-2 border-black mr-2 font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-gray-100 cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all" onClick={() => setSettingsOpen(true)}>
-            <Settings className="w-4 h-4 mr-2" /> Settings
+        <div className="flex items-center gap-2">
+          {/* Party Games Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="outline" className="bg-[#4ADE80] hover:bg-[#22C55E] text-black border-2 border-black font-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all">
+                  <Gamepad2 className="w-4 h-4 mr-1.5" /> Parti Oyunları
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end" className="bg-white brutal-border border-2 shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-1.5 font-bold z-50 text-xs w-52">
+              <DropdownMenuItem
+                onClick={() => setTriviaActive(true)}
+                className="flex items-center gap-2 p-2 hover:bg-[#FEF08A] cursor-pointer rounded-none font-bold"
+              >
+                <Sparkles className="w-4 h-4 text-purple-600" />
+                <span>Canlı Trivia Başlat</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setCreatePollOpen(true)}
+                className="flex items-center gap-2 p-2 hover:bg-[#FEF08A] cursor-pointer rounded-none font-bold"
+              >
+                <BarChart2 className="w-4 h-4 text-emerald-600" />
+                <span>Yeni Anket Oluştur</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => sendMessage("/zar")}
+                className="flex items-center gap-2 p-2 hover:bg-[#FEF08A] cursor-pointer rounded-none font-bold"
+              >
+                <Dices className="w-4 h-4 text-blue-600" />
+                <span>Zar At (/zar)</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => sendMessage("/yazitura")}
+                className="flex items-center gap-2 p-2 hover:bg-[#FEF08A] cursor-pointer rounded-none font-bold"
+              >
+                <Coins className="w-4 h-4 text-amber-600" />
+                <span>Yazı-Tura At (/yazitura)</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Polls Hub Button */}
+          <Button
+            variant="outline"
+            className="bg-[#FEF08A] hover:bg-[#FDE047] text-black border-2 border-black font-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all flex items-center gap-1.5"
+            onClick={() => setPollsDialogOpen(true)}
+          >
+            <BarChart2 className="w-4 h-4 text-black" />
+            <span>Anketler</span>
+            {activePollsCount > 0 && (
+              <span className="bg-black text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                {activePollsCount}
+              </span>
+            )}
           </Button>
-          <Button variant="outline" className="bg-white text-black border-2 border-black font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:bg-gray-100 cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all" onClick={() => router.push("/lobbies")}>
-            Leave
+
+          <Button variant="outline" className="bg-white hover:bg-[#FEF08A] text-black border-2 border-black font-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all" onClick={() => setSettingsOpen(true)}>
+            <Settings className="w-4 h-4 mr-2" /> Ayarlar
+          </Button>
+          <Button variant="outline" className="bg-white hover:bg-[#FFE4E6] text-black border-2 border-black font-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all" onClick={() => router.push("/lobbies")}>
+            Ayrıl
           </Button>
         </div>
       </div>
+
+
+      {/* Pending 1v1 RPS Challenge Banner */}
+      {pendingRpsChallenge && (
+        <div className="bg-[#FED7AA] border-b-4 border-black p-3 px-4 flex items-center justify-between shrink-0 animate-fade-in shadow-[0_2px_0_0_rgba(0,0,0,1)] z-20">
+          <div className="flex items-center gap-2 font-black text-sm text-black">
+            <span className="text-xl animate-bounce">✊</span>
+            <span><strong>{pendingRpsChallenge.fromUsername}</strong> seninle Taş-Kağıt-Makas oynamak istiyor!</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={handleAcceptRpsChallenge} className="bg-[#4ADE80] hover:bg-[#22C55E] text-black font-black border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] cursor-pointer">
+              Kabul Et
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleDeclineRpsChallenge} className="bg-white hover:bg-red-100 text-black font-black border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] cursor-pointer">
+              Reddet
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Pinned Active Poll Banner */}
+      {latestActivePoll && !isPollsBannerDismissed && user && (
+        <div className="bg-[#FEF08A] border-b-4 border-black p-3 px-4 shrink-0 transition-all shadow-[0_2px_0_0_rgba(0,0,0,1)] z-15">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs font-black uppercase tracking-wider bg-black text-white px-2 py-0.5 rounded-sm shrink-0">
+                📊 GÜNCEL ANKET
+              </span>
+              {isPollCollapsed ? (
+                <span className="text-xs font-bold text-black truncate">
+                  : {latestActivePoll.question}
+                </span>
+              ) : activePollsCount > 1 ? (
+                <span className="text-xs font-bold text-black/75 shrink-0">
+                  (+{activePollsCount - 1} anket daha)
+                </span>
+              ) : null}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setIsPollCollapsed((prev) => !prev)}
+                className="text-xs font-black bg-white hover:bg-neutral-100 border border-black px-2 py-0.5 rounded-sm shadow-[1px_1px_0_0_rgba(0,0,0,1)] cursor-pointer"
+                title={isPollCollapsed ? "Anketi Genişlet" : "Anketi Kısalt"}
+              >
+                {isPollCollapsed ? "Genişlet ▼" : "Kısalt ▲"}
+              </button>
+              <button
+                onClick={() => setPollsDialogOpen(true)}
+                className="text-xs font-black underline hover:text-blue-700 cursor-pointer hidden sm:inline"
+              >
+                Tüm Anketler ({polls.length})
+              </button>
+              <button
+                onClick={() => setIsPollsBannerDismissed(true)}
+                className="w-5 h-5 bg-white hover:bg-gray-200 border border-black rounded-sm flex items-center justify-center text-xs font-black cursor-pointer shadow-[1px_1px_0_0_rgba(0,0,0,1)]"
+                title="Bu oturumda gizle"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+          {!isPollCollapsed && (
+            <LobbyPollCard
+              poll={latestActivePoll}
+              currentUserId={user.id}
+              isModeratorOrOwner={canModerate}
+              onVote={handleVotePoll}
+              onClosePoll={handleClosePoll}
+              compact={true}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Live Trivia Arena */}
+      {triviaActive && user && (
+        <LobbyTrivia
+          lobbyId={lobbyId}
+          currentUserId={user.id}
+          currentUsername={user.username}
+          isActive={triviaActive}
+          onClose={() => setTriviaActive(false)}
+          sendGameAction={sendGameAction}
+          incomingGameEvent={incomingGameEvent}
+          onAnnounceToChat={(msg) => sendMessage(msg)}
+        />
+      )}
+
       
       {wsError && (
         <div className="bg-destructive text-destructive-foreground p-2 text-sm font-bold text-center border-b-[3px] border-black">
@@ -345,11 +904,12 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
         </div>
       )}
 
+
       {/* Chat Area */}
       <div ref={chatScrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 bg-[#f4f4f5] flex flex-col gap-4">
         {messages.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-foreground/50 font-medium">
-            No messages yet. Say hello!
+            Henüz mesaj yok. İlk mesajı siz yazın!
           </div>
         ) : (
           messages.map((msg) => {
@@ -372,7 +932,7 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
                       </span>
                       {msg.is_bot && (
                         <Badge className="bg-black text-white text-[9px] h-4 py-0 px-1 border-none shadow-none font-bold uppercase tracking-wider">
-                          Bot
+                          BOT
                         </Badge>
                       )}
                     </>
@@ -386,7 +946,7 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
                   {/* Sender Avatar Thumbnail */}
                   <div
                     className={`w-8 h-8 rounded-full border-2 border-black overflow-hidden flex items-center justify-center font-black text-xs shrink-0 cursor-pointer shadow-[1px_1px_0_0_rgba(0,0,0,1)] ${
-                      msg.is_bot ? "bg-[#FEF08A] text-black" : "bg-[#A78BFA] text-white"
+                      msg.is_bot ? "bg-[#FEF08A] text-black" : "bg-gradient-to-br from-[#FB923C] to-[#F472B6] text-white"
                     } ${isMe ? "order-last" : ""}`}
                     onClick={() => !isMe && handleOpenProfile(msg.sender.id)}
                     title={msg.sender.username}
@@ -405,41 +965,50 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
                   </div>
 
                   {/* Message Content Bubble */}
-                  <div className={`${bubbleBg} px-4 py-2.5 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] rounded-sm group-hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-shadow`}>
-                    <p className="whitespace-pre-wrap font-medium break-words leading-relaxed text-black/90">
-                      {renderMessageContent(msg.content, user?.username)}
-                    </p>
-                  </div>
+                  {isRichGameMessage(msg.content) ? (
+                    <RichGameCard
+                      content={msg.content}
+                      senderName={msg.sender.username}
+                      isMe={isMe}
+                      onAnnounceToChat={(text) => sendMessage(text)}
+                    />
+                  ) : (
+                    <div className={`${bubbleBg} px-4 py-2.5 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] rounded-sm group-hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-shadow`}>
+                      <p className="whitespace-pre-wrap font-medium break-words leading-relaxed text-black/90">
+                        {renderMessageContent(msg.content, user?.username)}
+                      </p>
+                    </div>
+                  )}
                   
-                  {!isMe && lobby?.owner_id === user?.id && !msg.is_bot && (
+                  {!isMe && canModerate && !msg.is_bot && (
                     <div className={`opacity-0 group-hover:opacity-100 has-[[data-state=open]]:opacity-100 transition-opacity ${isMe ? 'order-first' : ''}`}>
                       <DropdownMenu>
-                        <DropdownMenuTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-black/10 text-black/50 hover:text-black transition-colors outline-none focus:ring-2 focus:ring-black">
+                        <DropdownMenuTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-black/10 text-black/50 hover:text-black transition-colors outline-none focus:ring-2 focus:ring-black cursor-pointer">
                           <MoreVertical className="h-4 w-4" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align={isMe ? "end" : "start"} className="brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] w-48">
-                          <div className="px-2 py-1.5 text-sm font-bold">Moderation</div>
+                          <div className="px-2 py-1.5 text-sm font-bold">Moderasyon</div>
                           <DropdownMenuSeparator className="bg-black" />
                           <DropdownMenuItem onClick={() => handleModeration('mute', msg.sender.id, 15)} className="font-bold cursor-pointer text-orange-600 focus:bg-orange-100 focus:text-orange-700">
                             <MicOff className="mr-2 h-4 w-4" />
-                            Mute User (15m)
+                            Kullanıcıyı Sustur (15 dk)
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleModeration('mute', msg.sender.id, 60)} className="font-bold cursor-pointer text-orange-600 focus:bg-orange-100 focus:text-orange-700">
                             <MicOff className="mr-2 h-4 w-4" />
-                            Mute User (1h)
+                            Kullanıcıyı Sustur (1 sa)
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleModeration('unmute', msg.sender.id)} className="font-bold cursor-pointer text-green-600 focus:bg-green-100 focus:text-green-700">
                             <Mic className="mr-2 h-4 w-4" />
-                            Unmute User
+                            Susturmayı Kaldır
                           </DropdownMenuItem>
                           <DropdownMenuSeparator className="bg-black" />
                           <DropdownMenuItem onClick={() => handleModeration('kick', msg.sender.id)} className="font-bold cursor-pointer text-red-600 focus:bg-red-100 focus:text-red-700">
                             <UserMinus className="mr-2 h-4 w-4" />
-                            Kick User
+                            Lobiden At
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleModeration('ban', msg.sender.id)} className="font-bold cursor-pointer text-red-700 focus:bg-red-200 focus:text-red-800">
                             <Ban className="mr-2 h-4 w-4" />
-                            Ban User
+                            Lobiden Yasakla
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -450,6 +1019,8 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
             );
           })
         )}
+        {/* Active Typing Indicator */}
+        <TypingIndicator typingUsers={typingUsers} />
         {/* End of messages */}
       </div>
 
@@ -458,8 +1029,8 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
         {mentionQuery !== null && filteredMentions.length > 0 && (
           <div className="absolute bottom-full left-4 mb-2 bg-white brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-sm overflow-hidden z-50 min-w-[220px] max-h-48 overflow-y-auto">
             <div className="bg-black text-white px-2.5 py-1 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
-              <span>Mention Member</span>
-              <span className="text-[10px] text-gray-300">{filteredMentions.length} matches</span>
+              <span>Üyeden Bahset</span>
+              <span className="text-[10px] text-gray-300">{filteredMentions.length} eşleşme</span>
             </div>
             {filteredMentions.map((m, i) => (
               <div 
@@ -478,27 +1049,119 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
                   <span className="text-sm">@{m.username}</span>
                 </div>
                 <Badge className={`text-[9px] h-4 py-0 px-1 border-none shadow-none font-bold uppercase ${m.is_bot ? 'bg-black text-white' : 'bg-gray-200 text-black'}`}>
-                  {m.is_bot ? 'BOT' : 'USER'}
+                  {m.is_bot ? 'BOT' : 'KULLANICI'}
                 </Badge>
               </div>
             ))}
           </div>
         )}
-        <form onSubmit={handleSendMessage} className="flex gap-3">
+
+        {/* Quick Slash Commands Popup */}
+        {inputMessage.startsWith("/") && mentionQuery === null && (
+          <div className="absolute bottom-full left-4 mb-2 bg-white brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-sm overflow-hidden z-50 min-w-[220px]">
+            <div className="bg-black text-white px-2.5 py-1 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
+              <span>🎮 Parti Komutları</span>
+              <span className="text-[10px] text-gray-300">Tıkla veya Gönder</span>
+            </div>
+            <div
+              className="px-3 py-2 cursor-pointer font-bold border-b border-gray-200 hover:bg-[#FEF08A] flex items-center justify-between transition-colors"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                sendMessage("/zar");
+                setInputMessage("");
+              }}
+            >
+              <span className="flex items-center gap-1.5">🎲 /zar</span>
+              <span className="text-xs text-gray-500 font-normal">1-100 Zar At</span>
+            </div>
+            <div
+              className="px-3 py-2 cursor-pointer font-bold border-b border-gray-200 hover:bg-[#FEF08A] flex items-center justify-between transition-colors"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                sendMessage("/yazitura");
+                setInputMessage("");
+              }}
+            >
+              <span className="flex items-center gap-1.5">🪙 /yazitura</span>
+              <span className="text-xs text-gray-500 font-normal">Yazı-Tura At</span>
+            </div>
+            <div
+              className="px-3 py-2 cursor-pointer font-bold hover:bg-[#FEF08A] flex items-center justify-between transition-colors"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setTriviaActive(true);
+                setInputMessage("");
+              }}
+            >
+              <span className="flex items-center gap-1.5">🧠 /trivia</span>
+              <span className="text-xs text-gray-500 font-normal">Canlı Bilgi Yarışması</span>
+            </div>
+            <div
+              className="px-3 py-2 cursor-pointer font-bold hover:bg-[#FEF08A] flex items-center justify-between transition-colors border-t border-gray-200"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setCreatePollOpen(true);
+                setInputMessage("");
+              }}
+            >
+              <span className="flex items-center gap-1.5">📊 /anket</span>
+              <span className="text-xs text-gray-500 font-normal">Anket Başlat</span>
+            </div>
+            <div
+              className="px-3 py-2 cursor-pointer font-bold hover:bg-[#FEF08A] flex items-center justify-between transition-colors border-t border-gray-200"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleDropIcebreaker();
+                setInputMessage("");
+              }}
+            >
+              <span className="flex items-center gap-1.5">❄️ /soru</span>
+              <span className="text-xs text-gray-500 font-normal">Buz Kırıcı Tartışma</span>
+            </div>
+            <div
+              className="px-3 py-2 cursor-pointer font-bold hover:bg-[#FEF08A] flex items-center justify-between transition-colors border-t border-gray-200"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                sendMessage("/tkm");
+                setInputMessage("");
+              }}
+            >
+              <span className="flex items-center gap-1.5">✊ /tkm</span>
+              <span className="text-xs text-gray-500 font-normal">Taş-Kağıt-Makas</span>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={handleSendMessage} className="flex items-center gap-2.5" autoComplete="off">
+          <LobbyActivityMenu
+            disabled={!isConnected}
+            onStartTrivia={() => setTriviaActive(true)}
+            onOpenPoll={() => setCreatePollOpen(true)}
+            onOpenRps={() => {
+              if (user) {
+                sendMessage(`⚔️ [RPS MEYDAN OKUMASI]: @${user.username} herkesi Taş-Kağıt-Makas düellosuna davet etti!`);
+              }
+            }}
+            onDropIcebreaker={handleDropIcebreaker}
+            onRollDice={() => sendMessage("/zar")}
+            onFlipCoin={() => sendMessage("/yazitura")}
+          />
+
           <Input 
             value={inputMessage}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Type your message... (type @ to mention)"
+            placeholder="Mesajınızı yazın... (bahsetmek için @, komutlar için / yazın)"
+            autoComplete="off"
             className="flex-1 bg-white h-12 text-base font-medium brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus-visible:ring-0 focus-visible:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus-visible:translate-x-[2px] focus-visible:translate-y-[2px] transition-all"
             disabled={!isConnected}
           />
           <Button 
             type="submit" 
             disabled={!isConnected || !inputMessage.trim()}
-            className="h-12 px-8 bg-[#c084fc] hover:bg-[#a855f7] text-white font-bold text-lg brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-[0px_0px_0px_0px_rgba(0,0,0,1)] active:translate-x-[4px] active:translate-y-[4px] transition-all cursor-pointer"
+            className="h-12 px-8 bg-[#FB923C] hover:bg-[#F97316] text-black font-black text-lg brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-[0px_0px_0px_0px_rgba(0,0,0,1)] active:translate-x-[4px] active:translate-y-[4px] transition-all cursor-pointer"
           >
-            SEND
+            GÖNDER
           </Button>
         </form>
       </div>
@@ -510,9 +1173,10 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
         onMemberClick={handleOpenProfile} 
         lobbyId={lobbyId}
         currentUserId={user?.id}
-        currentUserRole={lobby?.owner_id === user?.id ? "OWNER" : (lobbyMembers.find(m => m.user_id === user?.id)?.role || "MEMBER")}
+        currentUserRole={myRole}
         isLobbyOwner={lobby?.owner_id === user?.id}
         onActionSuccess={refreshMembers}
+        onChallengeRps={handleChallengeRps}
       />
     </div>
 
@@ -520,7 +1184,7 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
       lobby={lobby} 
       isOpen={settingsOpen} 
       onClose={() => setSettingsOpen(false)} 
-      myRole={lobby.owner_id === user?.id ? 'OWNER' : 'MEMBER'}
+      myRole={myRole}
       currentUserId={user?.id}
       onUserProfileClick={handleOpenProfile}
       onLobbyUpdated={setLobby}
@@ -533,6 +1197,44 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
       onClose={() => setProfileOpen(false)}
     />
 
+    {rpsDuelState.isOpen && user && (
+      <LobbyRpsDuel
+        isOpen={rpsDuelState.isOpen}
+        onClose={() => setRpsDuelState((prev) => ({ ...prev, isOpen: false }))}
+        lobbyId={lobbyId}
+        currentUserId={user.id}
+        currentUsername={user.username}
+        opponentId={rpsDuelState.opponentId}
+        opponentUsername={rpsDuelState.opponentUsername}
+        opponentIsBot={rpsDuelState.opponentIsBot}
+        sendGameAction={sendGameAction}
+        incomingGameEvent={incomingGameEvent}
+        onAnnounceToChat={(msg) => sendMessage(msg)}
+      />
+    )}
+
+    <CreatePollModal
+      isOpen={createPollOpen}
+      onClose={() => setCreatePollOpen(false)}
+      lobbyId={lobbyId}
+      onPollCreated={(newPoll) => {
+        setPolls((prev) => [newPoll, ...prev.filter((p) => p.id !== newPoll.id)]);
+      }}
+    />
+
+    <LobbyPollsDialog
+      isOpen={pollsDialogOpen}
+      onClose={() => setPollsDialogOpen(false)}
+      polls={polls}
+      currentUserId={user?.id || ""}
+      isModeratorOrOwner={canModerate}
+      onVote={handleVotePoll}
+      onClosePoll={handleClosePoll}
+      onOpenCreateModal={() => setCreatePollOpen(true)}
+    />
+
     </ProtectedRoute>
+
   );
 }
+

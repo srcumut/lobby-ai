@@ -7,6 +7,7 @@ use uuid::Uuid;
 pub struct Notification {
     pub id: Uuid,
     pub user_id: Uuid,
+    #[serde(rename = "type")]
     pub r#type: String,
     pub title: String,
     pub message: String,

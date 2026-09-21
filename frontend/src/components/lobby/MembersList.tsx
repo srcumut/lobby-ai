@@ -20,6 +20,7 @@ interface MembersListProps {
   currentUserRole?: string;
   isLobbyOwner?: boolean;
   onActionSuccess?: () => void;
+  onChallengeRps?: (targetId: string, targetUsername: string, isBot?: boolean) => void;
 }
 
 export function MembersList({ 
@@ -31,7 +32,9 @@ export function MembersList({
   currentUserRole = "MEMBER",
   isLobbyOwner = false,
   onActionSuccess,
+  onChallengeRps,
 }: MembersListProps) {
+
   const humans = members.filter(m => !m.is_bot);
   const bots = members.filter(m => m.is_bot);
 
@@ -42,13 +45,13 @@ export function MembersList({
       return (
         <Badge className="bg-[#FEF08A] text-black border border-black text-[9px] px-1 py-0 h-4 flex items-center gap-0.5 shadow-[1px_1px_0_0_rgba(0,0,0,1)]">
           <Crown className="w-2.5 h-2.5 text-amber-600" />
-          OWNER
+          KURUCU
         </Badge>
       );
     }
     if (role === "MODERATOR") {
       return (
-        <Badge className="bg-[#C084FC] text-black border border-black text-[9px] px-1 py-0 h-4 flex items-center gap-0.5 shadow-[1px_1px_0_0_rgba(0,0,0,1)]">
+        <Badge className="bg-[#FB923C] text-black border border-black text-[9px] px-1 py-0 h-4 flex items-center gap-0.5 shadow-[1px_1px_0_0_rgba(0,0,0,1)] font-bold">
           <Shield className="w-2.5 h-2.5" />
           MOD
         </Badge>
@@ -59,9 +62,9 @@ export function MembersList({
 
   return (
     <aside className="w-64 bg-white border-l-4 border-black shrink-0 hidden lg:flex flex-col h-full brutal-shadow z-10">
-      <div className="p-4 border-b-4 border-black bg-[#E0F4FF] shrink-0">
+      <div className="p-4 border-b-4 border-black bg-[#FEF08A] shrink-0">
         <h3 className="font-black text-lg uppercase flex items-center gap-2">
-          <Users className="w-5 h-5" /> Members — {members.length}
+          <Users className="w-5 h-5" /> Üyeler — {members.length}
         </h3>
       </div>
       
@@ -70,7 +73,7 @@ export function MembersList({
         {/* Humans Section */}
         <div>
           <h4 className="text-xs font-black uppercase text-gray-500 mb-3 tracking-wider flex items-center justify-between">
-            <span>Online Humans</span>
+            <span>Çevrimiçi Kullanıcılar</span>
             <span className="bg-gray-100 px-1.5 py-0.5 border border-black text-[10px]">{humans.length}</span>
           </h4>
           <div className="space-y-1.5">
@@ -87,7 +90,7 @@ export function MembersList({
                     onClick={() => onMemberClick(human.user_id)}
                   >
                     {/* User Avatar */}
-                    <div className="w-8 h-8 rounded-full bg-[#A78BFA] border-2 border-black overflow-hidden flex items-center justify-center font-black text-white shrink-0 text-xs shadow-[1px_1px_0_0_rgba(0,0,0,1)]">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FB923C] to-[#F472B6] border-2 border-black overflow-hidden flex items-center justify-center font-black text-white shrink-0 text-xs shadow-[1px_1px_0_0_rgba(0,0,0,1)]">
                       {human.avatar_url ? (
                         <img 
                           src={getAvatarUrl(human.avatar_url)} 
@@ -103,21 +106,23 @@ export function MembersList({
                         <span className="font-bold text-sm truncate" title={human.username}>
                           {human.username}
                         </span>
-                        {isSelf && <span className="text-[10px] text-gray-400 font-bold">(You)</span>}
+                        {isSelf && <span className="text-[10px] text-gray-400 font-bold">(Sen)</span>}
                       </div>
                       {renderRoleBadge(human.role)}
                     </div>
                   </div>
 
-                  <MemberContextMenu 
-                    member={human}
-                    currentUserId={currentUserId}
-                    currentUserRole={currentUserRole}
-                    isLobbyOwner={isLobbyOwner}
-                    lobbyId={lobbyId}
-                    onOpenProfile={onMemberClick}
-                    onActionSuccess={onActionSuccess}
-                  />
+                    <MemberContextMenu 
+                      member={human}
+                      currentUserId={currentUserId}
+                      currentUserRole={currentUserRole}
+                      isLobbyOwner={isLobbyOwner}
+                      lobbyId={lobbyId}
+                      onOpenProfile={onMemberClick}
+                      onActionSuccess={onActionSuccess}
+                        onChallengeRps={onChallengeRps}
+                    />
+
                 </div>
               );
             })}
@@ -128,7 +133,7 @@ export function MembersList({
         {bots.length > 0 && (
           <div>
             <h4 className="text-xs font-black uppercase text-gray-500 mb-3 tracking-wider flex items-center justify-between">
-              <span className="flex items-center gap-1">Active Agents</span>
+              <span className="flex items-center gap-1">Aktif Ajanlar</span>
               <span className="bg-gray-100 px-1.5 py-0.5 border border-black text-[10px]">{bots.length}</span>
             </h4>
             <div className="space-y-1.5">
@@ -171,6 +176,7 @@ export function MembersList({
                     lobbyId={lobbyId}
                     onOpenProfile={onMemberClick}
                     onActionSuccess={onActionSuccess}
+                    onChallengeRps={onChallengeRps}
                   />
                 </div>
               ))}

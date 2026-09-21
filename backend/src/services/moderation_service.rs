@@ -218,5 +218,47 @@ pub async fn set_role(
         return Err(AppError::NotFound("Target user is not in the lobby".to_string()));
     }
 
-    lobby_repository::update_member_role(&state.db, lobby_id, target_id, new_role).await
+    let member = lobby_repository::update_member_role(&state.db, lobby_id, target_id, new_role).await?;
+
+    // Broadcast real-time role update events to lobby
+    let event = WsOutgoingEvent {
+        event_type: crate::schemas::ws_event::EVENT_USER_ROLE_UPDATED.to_string(),
+        payload: serde_json::json!({
+            "lobby_id": lobby_id,
+            "user_id": target_id,
+            "role": new_role,
+        }),
+    };
+    state.lobby_manager.broadcast(lobby_id, event).await;
+
+    let mod_event = WsOutgoingEvent {
+        event_type: "moderation.event".to_string(),
+        payload: serde_json::json!({
+            "action": "role_update",
+            "target_user_id": target_id,
+            "role": new_role,
+            "lobby_id": lobby_id,
+        }),
+    };
+    state.lobby_manager.broadcast(lobby_id, mod_event).await;
+
+    // Send notification to the promoted/demoted user
+    if let Ok(Some(lobby)) = lobby_repository::find_by_id(&state.db, lobby_id).await {
+        let role_title = if new_role == ROLE_MODERATOR { "Moderatör Yetkisi Verildi" } else { "Rolünüz Güncellendi" };
+        let role_desc = if new_role == ROLE_MODERATOR {
+            format!("{} lobisinde moderatör yapıldınız.", lobby.name)
+        } else {
+            format!("{} lobisinde rolünüz güncellendi ({}).", lobby.name, new_role)
+        };
+        let _ = crate::services::notification_service::create_notification(
+            state,
+            target_id,
+            "ROLE_UPDATED",
+            role_title,
+            &role_desc,
+            Some(lobby_id),
+        ).await;
+    }
+
+    Ok(member)
 }

@@ -30,13 +30,21 @@ export function AvatarPicker({
   onAvatarChanged,
   onAvatarRemoved,
   size = "lg",
-  label = "Profile Avatar",
-  modalTitle = "Set Avatar",
+  label = "Profil Fotoğrafı",
+  modalTitle = "Fotoğrafı Belirle",
   disabled = false,
 }: AvatarPickerProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedFileForModal, setSelectedFileForModal] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
+  const directFileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  // Sync with currentAvatarUrl updates from parent or backend
+  React.useEffect(() => {
+    setPreviewUrl(null);
+    setImgError(false);
+  }, [currentAvatarUrl]);
 
   const displaySrc = previewUrl || (currentAvatarUrl ? getAvatarUrl(currentAvatarUrl) : null);
 
@@ -60,8 +68,36 @@ export function AvatarPicker({
     await onAvatarRemoved();
   };
 
+  const handleDirectFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFileForModal(file);
+      setIsModalOpen(true);
+    }
+    e.target.value = "";
+  };
+
+  const openFilePicker = () => {
+    if (disabled) return;
+    directFileInputRef.current?.click();
+  };
+
+  const handleCloseModal = () => {
+    setSelectedFileForModal(null);
+    setIsModalOpen(false);
+  };
+
   return (
     <div className="flex flex-col items-center gap-3 select-none">
+      {/* Hidden file input for direct device file selection */}
+      <input
+        ref={directFileInputRef}
+        type="file"
+        accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.jfif,.bmp"
+        onChange={handleDirectFileSelect}
+        className="hidden"
+      />
+
       {label && (
         <span className="text-xs font-black uppercase tracking-wider text-gray-700">
           {label}
@@ -71,9 +107,9 @@ export function AvatarPicker({
       <div className="relative group">
         {/* Avatar Circle Container */}
         <div
-          onClick={() => !disabled && setIsModalOpen(true)}
+          onClick={openFilePicker}
           className={`${sizeClasses} rounded-full brutal-border border-4 overflow-hidden bg-[#FEF08A] flex items-center justify-center shadow-[4px_4px_0_0_rgba(0,0,0,1)] cursor-pointer relative transition-transform group-hover:scale-105`}
-          title="Click to change avatar"
+          title="Fotoğraf seçmek için tıklayın"
         >
           {displaySrc && !imgError ? (
             <img
@@ -94,7 +130,7 @@ export function AvatarPicker({
           {!disabled && (
             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-1">
               <Camera className="w-6 h-6" />
-              <span className="text-[10px] font-black uppercase tracking-tight">Upload</span>
+              <span className="text-[10px] font-black uppercase tracking-tight">Yükle</span>
             </div>
           )}
         </div>
@@ -103,9 +139,9 @@ export function AvatarPicker({
         {!disabled && (
           <button
             type="button"
-            onClick={() => setIsModalOpen(true)}
+            onClick={openFilePicker}
             className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#60A5FA] border-2 border-black flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:bg-[#3b82f6] cursor-pointer"
-            title="Upload image from computer"
+            title="Bilgisayardan fotoğraf yükle"
           >
             <Upload className="w-3.5 h-3.5 text-black" />
           </button>
@@ -119,11 +155,11 @@ export function AvatarPicker({
           size="sm"
           variant="outline"
           disabled={disabled}
-          onClick={() => setIsModalOpen(true)}
+          onClick={openFilePicker}
           className="bg-white text-black border-2 border-black font-black text-xs uppercase shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:bg-gray-100 cursor-pointer"
         >
           <Camera className="w-3 h-3 mr-1" />
-          {displaySrc ? "Change Photo" : "Upload Photo"}
+          {displaySrc ? "Fotoğrafı Değiştir" : "Fotoğraf Yükle"}
         </Button>
 
         {displaySrc && onAvatarRemoved && (
@@ -134,7 +170,7 @@ export function AvatarPicker({
             disabled={disabled}
             onClick={handleRemove}
             className="bg-[#FEE2E2] text-red-900 border-2 border-black font-black text-xs uppercase shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:bg-red-200 cursor-pointer"
-            title="Remove avatar"
+            title="Fotoğrafı kaldır"
           >
             <Trash2 className="w-3 h-3 text-red-600" />
           </Button>
@@ -144,10 +180,11 @@ export function AvatarPicker({
       {/* Cropper Modal */}
       <AvatarCropperModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleCloseModal}
         onCropComplete={handleCropComplete}
         title={modalTitle}
-        initialImageUrl={displaySrc}
+        initialImageUrl={null}
+        initialFile={selectedFileForModal}
       />
     </div>
   );

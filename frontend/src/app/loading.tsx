@@ -7,7 +7,7 @@ export default function Loading() {
         <div className="absolute inset-4 bg-[#F472B6] brutal-border animate-[spin_2s_linear_infinite]" />
       </div>
       <div className="bg-white px-4 py-2 brutal-border shadow-[4px_4px_0_0_rgba(0,0,0,1)] text-2xl font-black uppercase tracking-widest animate-pulse">
-        Loading...
+        Yükleniyor...
       </div>
     </div>
   );

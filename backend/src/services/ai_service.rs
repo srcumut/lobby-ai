@@ -3,11 +3,13 @@
 // PURPOSE: AI business logic including Agent CRUD with custom avatar support and LLM mention processing
 // ============================================================================
 
+use std::time::Duration;
 use uuid::Uuid;
 use tracing::{error, info};
 
 use crate::errors::AppError;
 use crate::models::ai::{Agent, AiCredential};
+use crate::models::user::User;
 use crate::models::message::Message;
 use crate::schemas::ai::{AddCredentialRequest, CreateAgentRequest, UpdateAgentRequest};
 use crate::state::SharedState;
@@ -64,10 +66,13 @@ pub async fn get_agents(
         r#"
         SELECT a.id, a.user_id, a.owner_id, a.name, a.provider, a.model, 
                a.personality_config, a.interest_config, a.communication_config, a.behavior_config, 
-               a.custom_instructions, a.created_at, a.updated_at,
-               u.avatar_url, u.username
+               a.custom_instructions, a.can_initiate_conversation, a.can_chat_with_agents, a.allow_user_interaction,
+               a.public_bio, a.created_at, a.updated_at,
+               u.avatar_url, u.username,
+               u_owner.username as owner_username
         FROM agents a
         JOIN users u ON u.id = a.user_id
+        LEFT JOIN users u_owner ON u_owner.id = a.owner_id
         WHERE a.owner_id = $1
         ORDER BY a.created_at DESC
         "#
@@ -87,10 +92,13 @@ pub async fn get_agent_by_id(
         r#"
         SELECT a.id, a.user_id, a.owner_id, a.name, a.provider, a.model, 
                a.personality_config, a.interest_config, a.communication_config, a.behavior_config, 
-               a.custom_instructions, a.created_at, a.updated_at,
-               u.avatar_url, u.username
+               a.custom_instructions, a.can_initiate_conversation, a.can_chat_with_agents, a.allow_user_interaction,
+               a.public_bio, a.created_at, a.updated_at,
+               u.avatar_url, u.username,
+               u_owner.username as owner_username
         FROM agents a
         JOIN users u ON u.id = a.user_id
+        LEFT JOIN users u_owner ON u_owner.id = a.owner_id
         WHERE a.id = $1
         "#
     )
@@ -147,9 +155,14 @@ pub async fn update_agent(
         SET name = $1, provider = $2, model = $3, 
             personality_config = $4, interest_config = $5, 
             communication_config = $6, behavior_config = $7, 
-            custom_instructions = $8, updated_at = NOW()
-        WHERE id = $9 AND owner_id = $10
-        RETURNING id, user_id, owner_id, name, provider, model, personality_config, interest_config, communication_config, behavior_config, custom_instructions, created_at, updated_at
+            custom_instructions = $8,
+            can_initiate_conversation = COALESCE($9, can_initiate_conversation),
+            can_chat_with_agents = COALESCE($10, can_chat_with_agents),
+            allow_user_interaction = COALESCE($11, allow_user_interaction),
+            public_bio = COALESCE($12, public_bio),
+            updated_at = NOW()
+        WHERE id = $13 AND owner_id = $14
+        RETURNING id, user_id, owner_id, name, provider, model, personality_config, interest_config, communication_config, behavior_config, custom_instructions, can_initiate_conversation, can_chat_with_agents, allow_user_interaction, public_bio, created_at, updated_at
         "#,
     )
     .bind(&request.name)
@@ -160,6 +173,10 @@ pub async fn update_agent(
     .bind(&request.communication_config)
     .bind(&request.behavior_config)
     .bind(&request.custom_instructions)
+    .bind(request.resolved_can_initiate())
+    .bind(request.resolved_can_chat_with_agents())
+    .bind(request.resolved_allow_user_interaction())
+    .bind(&request.public_bio)
     .bind(agent_id)
     .bind(owner_id)
     .fetch_one(&mut *tx)
@@ -280,11 +297,15 @@ pub async fn create_agent(
     .await?;
     
     // 2. Create the Agent
+    let can_initiate = request.resolved_can_initiate();
+    let can_chat_agents = request.resolved_can_chat_with_agents();
+    let allow_interaction = request.resolved_allow_user_interaction();
+
     let mut agent = sqlx::query_as::<_, Agent>(
         r#"
-        INSERT INTO agents (user_id, owner_id, name, provider, model, personality_config, interest_config, communication_config, behavior_config, custom_instructions)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-        RETURNING id, user_id, owner_id, name, provider, model, personality_config, interest_config, communication_config, behavior_config, custom_instructions, created_at, updated_at
+        INSERT INTO agents (user_id, owner_id, name, provider, model, personality_config, interest_config, communication_config, behavior_config, custom_instructions, can_initiate_conversation, can_chat_with_agents, allow_user_interaction, public_bio)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        RETURNING id, user_id, owner_id, name, provider, model, personality_config, interest_config, communication_config, behavior_config, custom_instructions, can_initiate_conversation, can_chat_with_agents, allow_user_interaction, public_bio, created_at, updated_at
         "#,
     )
     .bind(bot_user_id)
@@ -297,6 +318,10 @@ pub async fn create_agent(
     .bind(&request.communication_config)
     .bind(&request.behavior_config)
     .bind(&request.custom_instructions)
+    .bind(can_initiate)
+    .bind(can_chat_agents)
+    .bind(allow_interaction)
+    .bind(&request.public_bio)
     .fetch_one(&mut *tx)
     .await?;
     
@@ -308,6 +333,160 @@ pub async fn create_agent(
     Ok(agent)
 }
 
+/// Broadcasts a typing indicator state for a bot user in a lobby
+async fn set_bot_typing(state: &SharedState, lobby_id: Uuid, bot_user_id: Uuid, bot_name: &str, is_typing: bool) {
+    let event = crate::schemas::ws_event::WsOutgoingEvent {
+        event_type: crate::schemas::ws_event::EVENT_USER_TYPING.to_string(),
+        payload: serde_json::json!({
+            "lobby_id": lobby_id,
+            "user_id": bot_user_id,
+            "username": bot_name,
+            "is_typing": is_typing,
+        }),
+    };
+    state.lobby_manager.broadcast(lobby_id, event).await;
+}
+
+/// Initiates an AI agent conversation / opening message in a lobby with strict permission checks
+pub async fn initiate_agent_chat(
+    state: &SharedState,
+    lobby_id: Uuid,
+    agent_id: Uuid,
+    caller_id: Uuid,
+) -> Result<crate::schemas::message::MessageResponse, AppError> {
+    let agent = get_agent_by_id(state, agent_id).await?;
+
+    // 1. Permission check: can_initiate_conversation
+    if !agent.can_initiate_conversation {
+        return Err(AppError::Forbidden(
+            "This AI agent does not have permission to initiate conversations (can_initiate_conversation is false)".to_string(),
+        ));
+    }
+
+    // 2. Caller permission check: owner or (if allow_user_interaction, lobby member)
+    if agent.owner_id != caller_id {
+        if !agent.allow_user_interaction {
+            return Err(AppError::Forbidden(
+                "This agent does not allow interaction from users other than its owner".to_string(),
+            ));
+        }
+        let is_member = crate::repositories::lobby_repository::is_member(&state.db, lobby_id, caller_id).await?;
+        if !is_member {
+            return Err(AppError::Forbidden("You are not a member of this lobby".to_string()));
+        }
+
+        let allowed_users_opt: Option<Vec<String>> = agent
+            .behavior_config
+            .as_ref()
+            .and_then(|bc| {
+                bc.get("permissions")
+                    .and_then(|p| p.get("allowed_users"))
+                    .or_else(|| bc.get("allowed_users"))
+            })
+            .and_then(|v| serde_json::from_value(v.clone()).ok());
+
+        if let Some(allowed_list) = allowed_users_opt {
+            if !allowed_list.is_empty() {
+                let caller_id_str = caller_id.to_string();
+                if !allowed_list.iter().any(|u| u.eq_ignore_ascii_case(&caller_id_str)) {
+                    return Err(AppError::Forbidden("You are not in this agent's authorized users list".to_string()));
+                }
+            }
+        }
+    }
+
+    // 3. Verify agent is in the lobby
+    let is_agent_member = crate::repositories::lobby_repository::is_member(&state.db, lobby_id, agent.user_id).await?;
+    if !is_agent_member {
+        return Err(AppError::BadRequest("Agent is not a member of this lobby".to_string()));
+    }
+
+    // Broadcast bot typing indicator = true
+    set_bot_typing(state, lobby_id, agent.user_id, &agent.name, true).await;
+
+    // Fetch API credentials (case-insensitive with system fallback)
+    let cred = match sqlx::query_as::<_, AiCredential>(
+        "SELECT id, user_id, provider, encrypted_key, nonce, created_at FROM ai_credentials WHERE user_id = $1 AND LOWER(provider) = LOWER($2)"
+    )
+    .bind(agent.owner_id)
+    .bind(&agent.provider)
+    .fetch_optional(&state.db)
+    .await? {
+        Some(c) => c,
+        None => {
+            sqlx::query_as::<_, AiCredential>(
+                "SELECT id, user_id, provider, encrypted_key, nonce, created_at FROM ai_credentials WHERE LOWER(provider) = LOWER($1) LIMIT 1"
+            )
+            .bind(&agent.provider)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::BadRequest(format!("No credentials configured for provider: {}", agent.provider)))?
+        }
+    };
+
+    let decrypted_key = decrypt_key(&cred.encrypted_key, &cred.nonce, &state.config.encryption_key)?;
+
+    let mut recent_messages = crate::repositories::message_repository::get_lobby_messages(&state.db, lobby_id, 10, None).await.unwrap_or_default();
+    recent_messages.reverse();
+
+    let mut system_prompt = build_system_prompt(&agent);
+    system_prompt.push_str("\n\nYou are initiating a conversation or saying hello in this lobby. Stay natural, engaging, and in character.");
+
+    let provider = get_provider(&agent.provider);
+    let reply_text = match provider.generate_response(
+        &agent,
+        &system_prompt,
+        &recent_messages,
+        &decrypted_key,
+    ).await {
+        Ok(t) => t,
+        Err(e) => {
+            error!("Agent {} failed to generate initiation message: {}", agent.name, e);
+            set_bot_typing(state, lobby_id, agent.user_id, &agent.name, false).await;
+            return Err(AppError::Internal(format!("AI generation failed: {}", e)));
+        }
+    };
+
+    set_bot_typing(state, lobby_id, agent.user_id, &agent.name, false).await;
+
+    // Persist message
+    let bot_message = crate::repositories::message_repository::create_message(
+        &state.db,
+        lobby_id,
+        agent.user_id,
+        &reply_text,
+    ).await?;
+
+    let bot_user = crate::repositories::user_repository::find_by_id(&state.db, agent.user_id).await?
+        .ok_or_else(|| AppError::Internal("Bot user not found".to_string()))?;
+
+    let message_response = crate::schemas::message::MessageResponse {
+        id: bot_message.id,
+        lobby_id: bot_message.lobby_id,
+        sender: crate::schemas::message::MessageSender {
+            id: bot_user.id,
+            username: bot_user.username,
+            display_name: bot_user.display_name,
+            avatar_url: bot_user.avatar_url,
+        },
+        content: bot_message.content.clone(),
+        is_bot: true,
+        created_at: bot_message.created_at,
+        reactions: std::collections::HashMap::new(),
+    };
+
+    let ws_event = crate::schemas::ws_event::WsOutgoingEvent {
+        event_type: "message.created".to_string(),
+        payload: serde_json::to_value(&message_response).unwrap(),
+    };
+    state.lobby_manager.broadcast(lobby_id, ws_event).await;
+
+    // Trigger any mentions in this opening message
+    handle_agent_mention(state.clone(), lobby_id, bot_message);
+
+    Ok(message_response)
+}
+
 /// Analyzes mentions in an incoming chat message and dispatches LLM completion for target agents
 pub fn handle_agent_mention(
     state: SharedState,
@@ -317,6 +496,66 @@ pub fn handle_agent_mention(
     let content = message.content.clone();
     
     tokio::spawn(async move {
+        // Fetch sender user to check whether sender is a bot
+        let sender_user = match crate::repositories::user_repository::find_by_id(&state.db, message.sender_id).await {
+            Ok(Some(u)) => u,
+            _ => return,
+        };
+
+        // If sender is a bot, enforce agent-to-agent permissions & loop protection
+        if sender_user.is_bot {
+            // Check sender agent's can_chat_with_agents permission
+            let sender_agent = sqlx::query_as::<_, Agent>(
+                r#"
+                SELECT a.id, a.user_id, a.owner_id, a.name, a.provider, a.model, 
+                       a.personality_config, a.interest_config, a.communication_config, a.behavior_config, 
+                       a.custom_instructions, a.can_initiate_conversation, a.can_chat_with_agents, a.allow_user_interaction,
+                       a.created_at, a.updated_at,
+                       u.avatar_url, u.username
+                FROM agents a
+                JOIN users u ON u.id = a.user_id
+                WHERE a.user_id = $1
+                "#
+            )
+            .bind(sender_user.id)
+            .fetch_optional(&state.db)
+            .await
+            .ok()
+            .flatten();
+
+            if let Some(sa) = sender_agent {
+                if !sa.can_chat_with_agents {
+                    info!("Sender agent {} does not have can_chat_with_agents enabled, aborting mention cascade", sa.name);
+                    return;
+                }
+            } else {
+                return;
+            }
+
+            // Loop protection: inspect recent messages in this lobby
+            if let Ok(recent) = crate::repositories::message_repository::get_lobby_messages(&state.db, lobby_id, 4, None).await {
+                let mut bot_count = 0;
+                for m in &recent {
+                    if let Ok(Some(u)) = crate::repositories::user_repository::find_by_id(&state.db, m.sender_id).await {
+                        if u.is_bot {
+                            bot_count += 1;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+
+                if bot_count >= 3 {
+                    tracing::warn!(
+                        lobby_id = %lobby_id,
+                        "AI Agent loop protection triggered: {} consecutive bot messages detected. Halting agent replies.",
+                        bot_count
+                    );
+                    return;
+                }
+            }
+        }
+
         // Regex to extract all @username occurrences
         lazy_static::lazy_static! {
             static ref MENTION_RE: regex::Regex = regex::Regex::new(r"@([a-zA-Z0-9_]{3,32})").unwrap();
@@ -336,23 +575,33 @@ pub fn handle_agent_mention(
         info!("Mentions found in lobby {}: {:?}", lobby_id, mentioned_usernames);
 
         for username in mentioned_usernames {
-            let user_record = match crate::repositories::user_repository::find_by_username(&state.db, &username).await {
+            // Case-insensitive lookup matching either username, display_name, or normalised name
+            let user_record = match sqlx::query_as::<_, User>(
+                "SELECT id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, coins, is_bot, created_at, updated_at FROM users WHERE (LOWER(username) = LOWER($1) OR LOWER(display_name) = LOWER($1) OR REPLACE(LOWER(username), '_', '') = LOWER($1)) AND is_bot = true LIMIT 1"
+            )
+            .bind(&username)
+            .fetch_optional(&state.db)
+            .await {
                 Ok(Some(u)) => u,
                 _ => continue,
             };
 
-            if !user_record.is_bot {
-                continue; // Only process AI bot mentions
+            // Only process AI bot mentions and prevent self-mentions
+            if user_record.id == message.sender_id {
+                continue;
             }
 
             let agent = match sqlx::query_as::<_, Agent>(
                 r#"
                 SELECT a.id, a.user_id, a.owner_id, a.name, a.provider, a.model, 
                        a.personality_config, a.interest_config, a.communication_config, a.behavior_config, 
-                       a.custom_instructions, a.created_at, a.updated_at,
-                       u.avatar_url, u.username
+                       a.custom_instructions, a.can_initiate_conversation, a.can_chat_with_agents, a.allow_user_interaction,
+                       a.public_bio, a.created_at, a.updated_at,
+                       u.avatar_url, u.username,
+                       u_owner.username as owner_username
                 FROM agents a
                 JOIN users u ON u.id = a.user_id
+                LEFT JOIN users u_owner ON u_owner.id = a.owner_id
                 WHERE a.user_id = $1
                 "#
             )
@@ -366,9 +615,84 @@ pub fn handle_agent_mention(
                 }
             };
 
-            // Fetch owner's encrypted API credential for this provider
+            // Permission Check 1: Agent-to-Agent interaction
+            if sender_user.is_bot && !agent.can_chat_with_agents {
+                info!("Agent {} has can_chat_with_agents=false, ignoring mention from bot {}", agent.name, sender_user.username);
+                continue;
+            }
+
+            // Permission Check 2: Interaction permissions (interaction_mode / allowed_users)
+            let interaction_mode = agent
+                .behavior_config
+                .as_ref()
+                .and_then(|bc| {
+                    bc.get("interaction_mode")
+                        .or_else(|| bc.get("permissions").and_then(|p| p.get("interaction_mode")))
+                })
+                .and_then(|v| v.as_str())
+                .unwrap_or("EVERYONE");
+
+            if !sender_user.is_bot && sender_user.id != agent.owner_id {
+                match interaction_mode {
+                    "OWNER_ONLY" => {
+                        info!("Agent {} has interaction_mode=OWNER_ONLY and sender is not owner, ignoring mention", agent.name);
+                        continue;
+                    }
+                    "MODERATORS" => {
+                        // Check if sender is OWNER or MODERATOR of this lobby
+                        let member_role = crate::repositories::lobby_repository::get_member_role(&state.db, lobby_id, sender_user.id)
+                            .await
+                            .ok()
+                            .flatten();
+                        let is_mod = member_role.as_deref() == Some("OWNER") || member_role.as_deref() == Some("MODERATOR");
+                        if !is_mod {
+                            info!("Agent {} has interaction_mode=MODERATORS and sender is neither owner nor lobby mod, ignoring mention", agent.name);
+                            continue;
+                        }
+                    }
+                    "WHITELIST" => {
+                        let allowed_users_opt: Option<Vec<String>> = agent
+                            .behavior_config
+                            .as_ref()
+                            .and_then(|bc| {
+                                bc.get("permissions")
+                                    .and_then(|p| p.get("allowed_users"))
+                                    .or_else(|| bc.get("allowed_users"))
+                            })
+                            .and_then(|v| serde_json::from_value(v.clone()).ok());
+
+                        if let Some(allowed_list) = allowed_users_opt {
+                            if !allowed_list.is_empty() {
+                                let sender_id_str = sender_user.id.to_string();
+                                let is_allowed = allowed_list.iter().any(|u| {
+                                    u.eq_ignore_ascii_case(&sender_id_str) || u.eq_ignore_ascii_case(&sender_user.username)
+                                });
+                                if !is_allowed {
+                                    info!("User {} is not in agent {}'s allowed_users whitelist, ignoring mention", sender_user.username, agent.name);
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                    _ => {
+                        // "EVERYONE" fallback to allow_user_interaction check
+                        if !agent.allow_user_interaction {
+                            info!("Agent {} has allow_user_interaction=false and sender is not owner, ignoring mention", agent.name);
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            // Natural 0.75-second delay before typing animation starts
+            tokio::time::sleep(Duration::from_millis(750)).await;
+
+            // Show typing indicator for bot
+            set_bot_typing(&state, lobby_id, agent.user_id, &agent.name, true).await;
+
+            // Fetch owner's encrypted API credential for this provider (case-insensitive)
             let cred = match sqlx::query_as::<_, AiCredential>(
-                "SELECT id, user_id, provider, encrypted_key, nonce, created_at FROM ai_credentials WHERE user_id = $1 AND provider = $2"
+                "SELECT id, user_id, provider, encrypted_key, nonce, created_at FROM ai_credentials WHERE user_id = $1 AND LOWER(provider) = LOWER($2)"
             )
             .bind(agent.owner_id)
             .bind(&agent.provider)
@@ -376,8 +700,24 @@ pub fn handle_agent_mention(
             .await {
                 Ok(Some(c)) => c,
                 _ => {
-                    error!("Agent {} owner does not have credentials for {}", agent.name, agent.provider);
-                    continue;
+                    // Fallback to any active credential in the system for this provider
+                    let fallback = sqlx::query_as::<_, AiCredential>(
+                        "SELECT id, user_id, provider, encrypted_key, nonce, created_at FROM ai_credentials WHERE LOWER(provider) = LOWER($1) LIMIT 1"
+                    )
+                    .bind(&agent.provider)
+                    .fetch_optional(&state.db)
+                    .await
+                    .ok()
+                    .flatten();
+
+                    match fallback {
+                        Some(c) => c,
+                        None => {
+                            error!("No credentials found for provider {}", agent.provider);
+                            set_bot_typing(&state, lobby_id, agent.user_id, &agent.name, false).await;
+                            continue;
+                        }
+                    }
                 }
             };
 
@@ -385,6 +725,7 @@ pub fn handle_agent_mention(
                 Ok(k) => k,
                 Err(e) => {
                     error!("Failed to decrypt API key for agent {}: {}", agent.name, e);
+                    set_bot_typing(&state, lobby_id, agent.user_id, &agent.name, false).await;
                     continue;
                 }
             };
@@ -411,9 +752,12 @@ pub fn handle_agent_mention(
                 Ok(t) => t,
                 Err(e) => {
                     error!("Agent {} LLM generation failed: {}", agent.name, e);
-                    format!("*(Failed to generate response: {})*", e)
+                    "*(⚠️ Yapay zeka servisi şu anda aşırı yoğunluk nedeniyle yanıt veremedi. Lütfen birazdan tekrar deneyin.)*".to_string()
                 }
             };
+
+            // Turn off typing indicator
+            set_bot_typing(&state, lobby_id, agent.user_id, &agent.name, false).await;
 
             dispatch_bot_reply(state.clone(), lobby_id, agent.user_id, reply_text).await;
         }
@@ -459,7 +803,7 @@ async fn dispatch_bot_reply(
                 display_name: bot_user.display_name,
                 avatar_url: bot_user.avatar_url,
             },
-            content: bot_message.content,
+            content: bot_message.content.clone(),
             is_bot: true,
             created_at: bot_message.created_at,
             reactions: std::collections::HashMap::new(),
@@ -472,5 +816,53 @@ async fn dispatch_bot_reply(
 
         state.lobby_manager.broadcast(lobby_id, ws_event).await;
         info!("Bot {} replied in lobby {}", bot_user_id, lobby_id);
+
+        // Allow subsequent bot mentions with loop protection
+        handle_agent_mention(state.clone(), lobby_id, bot_message);
     });
+}
+
+/// Tests an agent's prompt in sandbox mode without requiring a lobby or persistence
+pub async fn test_agent_prompt(
+    state: &SharedState,
+    caller_id: Uuid,
+    agent_id: Uuid,
+    message: &str,
+) -> Result<String, AppError> {
+    let agent = get_agent_by_id(state, agent_id).await?;
+
+    if agent.owner_id != caller_id {
+        return Err(AppError::Forbidden("You do not own this agent".to_string()));
+    }
+
+    let cred = sqlx::query_as::<_, AiCredential>(
+        "SELECT id, user_id, provider, encrypted_key, nonce, created_at FROM ai_credentials WHERE user_id = $1 AND provider = $2"
+    )
+    .bind(agent.owner_id)
+    .bind(&agent.provider)
+    .fetch_optional(&state.db)
+    .await?
+    .ok_or_else(|| AppError::BadRequest(format!("Agent owner does not have credentials configured for provider: {}", agent.provider)))?;
+
+    let decrypted_key = decrypt_key(&cred.encrypted_key, &cred.nonce, &state.config.encryption_key)?;
+
+    let system_prompt = build_system_prompt(&agent);
+
+    let test_msg = crate::models::message::Message {
+        id: Uuid::new_v4(),
+        lobby_id: Uuid::new_v4(),
+        sender_id: caller_id,
+        content: message.to_string(),
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+        deleted_at: None,
+    };
+
+    let provider = get_provider(&agent.provider);
+    let reply_text = provider
+        .generate_response(&agent, &system_prompt, &[test_msg], &decrypted_key)
+        .await
+        .map_err(|e| AppError::Internal(format!("AI test generation failed: {e}")))?;
+
+    Ok(reply_text)
 }

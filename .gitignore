@@ -6,6 +6,7 @@
 # Rust
 target/
 *.rs.bk
+backend/src/bin/
 
 # Node / Frontend
 node_modules/

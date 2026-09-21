@@ -91,7 +91,16 @@ pub async fn add_bot_to_lobby(
     Json(payload): Json<crate::schemas::lobby::AddBotRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     lobby_service::add_bot_to_lobby(&state, lobby_id, auth.user_id, payload.bot_user_id).await?;
-    Ok(Json(serde_json::json!({"status": "success"})))
+    Ok(Json(serde_json::json!({"status": "success", "lobby_id": lobby_id, "bot_user_id": payload.bot_user_id})))
+}
+
+pub async fn initiate_agent_chat(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    Path((lobby_id, agent_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<crate::schemas::message::MessageResponse>, AppError> {
+    let msg = crate::services::ai_service::initiate_agent_chat(&state, lobby_id, agent_id, auth.user_id).await?;
+    Ok(Json(msg))
 }
 
 pub async fn approve_request(
@@ -198,4 +207,13 @@ pub async fn update_notification_preference(
 
     lobby_service::update_notification_preference(&state, lobby_id, auth.user_id, &payload.preference).await?;
     Ok(Json(serde_json::json!({ "message": "Notification preference updated", "preference": payload.preference })))
+}
+
+pub async fn get_notification_preference(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    axum::extract::Path(lobby_id): axum::extract::Path<Uuid>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let preference = lobby_service::get_notification_preference(&state, lobby_id, auth.user_id).await?;
+    Ok(Json(serde_json::json!({ "preference": preference })))
 }

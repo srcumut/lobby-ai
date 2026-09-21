@@ -11,7 +11,7 @@ use validator::Validate;
 
 use crate::errors::AppError;
 use crate::models::ai::{Agent, AiCredential};
-use crate::schemas::ai::{AddCredentialRequest, CreateAgentRequest, UpdateAgentRequest};
+use crate::schemas::ai::{AddCredentialRequest, CreateAgentRequest, TestAgentRequest, UpdateAgentRequest};
 use crate::middleware::auth_middleware::AuthenticatedUser;
 use crate::state::SharedState;
 use crate::services::{ai_service, upload_service};
@@ -112,3 +112,15 @@ pub async fn delete_agent(
     ai_service::delete_agent(&state, auth.user_id, id).await?;
     Ok(Json(serde_json::json!({ "message": "Agent deleted successfully" })))
 }
+
+pub async fn test_agent(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    axum::extract::Path(id): axum::extract::Path<uuid::Uuid>,
+    Json(payload): Json<TestAgentRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    payload.validate().map_err(|e| AppError::Validation(e.to_string()))?;
+    let reply = ai_service::test_agent_prompt(&state, auth.user_id, id, &payload.message).await?;
+    Ok(Json(serde_json::json!({ "response": reply })))
+}
+

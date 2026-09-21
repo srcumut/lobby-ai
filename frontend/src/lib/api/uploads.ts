@@ -19,11 +19,7 @@ export const uploadsApi = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await apiClient.post<AvatarUploadResponse>('/uploads/avatar', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const response = await apiClient.post<AvatarUploadResponse>('/uploads/avatar', formData);
 
     return response.data;
   },

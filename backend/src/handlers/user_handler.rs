@@ -23,8 +23,13 @@ pub async fn get_me(
         username: user.username,
         email: user.email,
         display_name: user.display_name,
+        first_name: user.first_name,
+        last_name: user.last_name,
         avatar_url: user.avatar_url,
+        banner_url: user.banner_url,
         bio: user.bio,
+        badges: user.badges,
+        coins: user.coins,
         is_bot: user.is_bot,
         created_at: user.created_at,
     }))
@@ -66,6 +71,24 @@ pub async fn delete_my_avatar(
     auth: AuthenticatedUser,
 ) -> Result<Json<UserInfo>, AppError> {
     let updated_user = user_service::update_avatar(&state, auth.user_id, None).await?;
+    Ok(Json(updated_user))
+}
+
+pub async fn upload_my_banner(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    multipart: Multipart,
+) -> Result<Json<UserInfo>, AppError> {
+    let banner_url = upload_service::save_avatar_file(multipart).await?;
+    let updated_user = user_service::update_banner(&state, auth.user_id, Some(banner_url)).await?;
+    Ok(Json(updated_user))
+}
+
+pub async fn delete_my_banner(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+) -> Result<Json<UserInfo>, AppError> {
+    let updated_user = user_service::update_banner(&state, auth.user_id, None).await?;
     Ok(Json(updated_user))
 }
 
@@ -120,3 +143,62 @@ pub async fn get_friends(
     let friends = user_service::get_friends(&state, auth.user_id).await?;
     Ok(Json(friends))
 }
+
+#[derive(serde::Deserialize)]
+pub struct UnlockBadgeRequest {
+    pub badge: String,
+}
+
+pub async fn unlock_badge(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    Json(payload): Json<UnlockBadgeRequest>,
+) -> Result<Json<UserInfo>, AppError> {
+    let user = user_service::unlock_badge(&state, auth.user_id, &payload.badge).await?;
+    Ok(Json(user))
+}
+
+#[derive(serde::Deserialize)]
+pub struct AddCoinsRequest {
+    pub amount: i32,
+}
+
+pub async fn add_coins(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    Json(payload): Json<AddCoinsRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let coins = user_service::add_coins(&state, auth.user_id, payload.amount).await?;
+    Ok(Json(serde_json::json!({ "coins": coins })))
+}
+
+#[derive(serde::Deserialize)]
+pub struct PurchaseItemRequest {
+    pub item_id: String,
+    pub item_type: String,
+    pub price: i32,
+}
+
+pub async fn purchase_shop_item(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    Json(payload): Json<PurchaseItemRequest>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let remaining_coins = user_service::purchase_shop_item(
+        &state,
+        auth.user_id,
+        &payload.item_id,
+        &payload.item_type,
+        payload.price,
+    ).await?;
+    Ok(Json(serde_json::json!({ "coins": remaining_coins, "item_id": payload.item_id })))
+}
+
+pub async fn get_inventory(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+) -> Result<Json<Vec<String>>, AppError> {
+    let inventory = user_service::get_inventory(&state, auth.user_id).await?;
+    Ok(Json(inventory))
+}
+

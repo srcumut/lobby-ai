@@ -7,9 +7,29 @@ use uuid::Uuid;
 use crate::errors::AppError;
 use crate::middleware::auth_middleware::AuthenticatedUser;
 use crate::repositories::lobby_repository;
-use crate::schemas::message::{MessageQuery, MessageResponse};
+use crate::schemas::message::{CreateMessageRequest, MessageQuery, MessageResponse};
 use crate::services::message_service;
 use crate::state::SharedState;
+
+pub async fn create_message(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    Path(lobby_id): Path<Uuid>,
+    Json(request): Json<CreateMessageRequest>,
+) -> Result<Json<MessageResponse>, AppError> {
+    use validator::Validate;
+    request.validate().map_err(|e| AppError::Validation(e.to_string()))?;
+
+    // Verify membership
+    if !lobby_repository::is_member(&state.db, lobby_id, auth.user_id).await? {
+        return Err(AppError::Forbidden(
+            "You must be a member of this lobby to send messages".to_string(),
+        ));
+    }
+
+    let message = message_service::create_message(&state, lobby_id, auth.user_id, &request.content).await?;
+    Ok(Json(message))
+}
 
 pub async fn get_messages(
     State(state): State<SharedState>,

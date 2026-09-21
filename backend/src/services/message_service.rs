@@ -43,22 +43,90 @@ pub async fn create_message(
         }
     }
 
+    let is_dice = trimmed == "/zar" || trimmed == "/roll";
+    let is_coin = trimmed == "/yazitura" || trimmed == "/yazı-tura" || trimmed == "/coin" || trimmed == "/flip";
+    let mut rolled_num: u32 = 0;
+
+    let processed_content = if is_dice {
+        let roll = (rand::random::<u32>() % 6) + 1;
+        rolled_num = roll;
+        let note = if roll == 6 {
+            " 🔥 [UĞURLU 6!]"
+        } else if roll == 1 {
+            " 🐍 [YILAN GÖZÜ 1!]"
+        } else {
+            ""
+        };
+        format!("🎲 Zar attı: {} / 6{}", roll, note)
+    } else if is_coin {
+        let is_heads = rand::random::<bool>();
+        let result = if is_heads { "YAZI" } else { "TURA" };
+        format!("🪙 Yazı-tura attı: {}! 🪙", result)
+    } else if trimmed == "/soru" || trimmed == "/buzkirici" || trimmed == "/icebreaker" {
+        let icebreakers = [
+            "Eğer hayatınızın geri kalanında sadece tek bir teknoloji kullanabilseydiniz, hangisini seçerdiniz?",
+            "Yapay zeka modelleri gerçekten bilinç kazanabilir mi, yoksa sadece çok gelişmiş bir olasılık aynası mıyız?",
+            "Geçmişteki herhangi bir tarihi olaya şahit olma şansınız olsaydı nereye giderdiniz?",
+            "Bir video oyunu evreninde 1 ay yaşamak zorunda kalsaydınız hangi dünyayı seçerdiniz?",
+            "Uzaylılar Dünya'ya gelse ve insanlığı temsil edecek tek bir şarkı seçmemiz gerekseydi bu ne olurdu?",
+            "Sizce 10 yıl sonra yazılım geliştiriciliği nasıl bir meslek olacak? Kod yazmaya devam edecek miyiz?",
+            "Zaman yolculuğu mu, yoksa ışınlanma gücü mü? Hangisini ve neden seçerdiniz?",
+            "Bir yapay zeka ajanı tüm günlük rutin işlerinizi yapsa, kazandığınız serbest zamanla ilk ne yapardınız?",
+        ];
+        let idx = (rand::random::<u32>() as usize) % icebreakers.len();
+        format!("❄️ [GÜNÜN TARTIŞMA SORUSU]: {}", icebreakers[idx])
+    } else if trimmed == "/tkm" {
+        let choices = ["Taş 🪨", "Kağıt 📄", "Makas ✂️"];
+        let idx = (rand::random::<u32>() as usize) % choices.len();
+        format!("✊ [TAŞ-KAĞIT-MAKAS]: Rastgele hamle yaptı: {}!", choices[idx])
+    } else {
+        trimmed.to_string()
+    };
+
     let message =
-        message_repository::create_message(&state.db, lobby_id, sender_id, trimmed).await?;
+        message_repository::create_message(&state.db, lobby_id, sender_id, &processed_content).await?;
+
+    if is_dice {
+        if rolled_num == 6 {
+            let _ = user_repository::unlock_badge(&state.db, sender_id, "lucky_six").await;
+            let last_rolls = sqlx::query_scalar::<_, String>(
+                r#"
+                SELECT content FROM messages
+                WHERE lobby_id = $1 AND sender_id = $2 AND content LIKE '🎲 Zar attı: %'
+                ORDER BY created_at DESC
+                LIMIT 3
+                "#
+            )
+            .bind(lobby_id)
+            .bind(sender_id)
+            .fetch_all(&state.db)
+            .await
+            .unwrap_or_default();
+
+            if last_rolls.len() >= 3 && last_rolls.iter().all(|c| c.contains("Zar attı: 6 / 6")) {
+                let _ = user_repository::unlock_badge(&state.db, sender_id, "triple_six").await;
+            }
+        } else if rolled_num == 1 {
+            let _ = user_repository::unlock_badge(&state.db, sender_id, "snake_eyes").await;
+        }
+    } else if is_coin {
+        let _ = user_repository::unlock_badge(&state.db, sender_id, "coin_flipper").await;
+    } else {
+        let _ = user_repository::unlock_badge(&state.db, sender_id, "first_hello").await;
+    }
+
 
     let sender = user_repository::find_by_id(&state.db, sender_id)
         .await?
         .ok_or_else(|| AppError::Internal("Sender not found".to_string()))?;
 
-    // --- NEW: AI Bot Mention Detection ---
-    if !sender.is_bot {
-        crate::services::ai_service::handle_agent_mention(
-            state.clone(),
-            lobby_id,
-            message.clone(),
-        );
-    }
-    // --- END NEW ---
+    // --- AI Bot Mention Detection (handles both user and bot mentions with loop protection & permissions) ---
+    crate::services::ai_service::handle_agent_mention(
+        state.clone(),
+        lobby_id,
+        message.clone(),
+    );
+    // --- END AI Bot Mention Detection ---
 
     // --- Lobby Notification & Mentions Logic ---
     if !sender.is_bot {

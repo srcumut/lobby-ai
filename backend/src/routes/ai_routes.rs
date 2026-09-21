@@ -24,4 +24,8 @@ pub fn routes() -> Router<crate::state::SharedState> {
             "/agents/{id}/avatar",
             post(ai_handler::upload_agent_avatar).delete(ai_handler::delete_agent_avatar),
         )
+        .route(
+            "/agents/{id}/test",
+            post(ai_handler::test_agent),
+        )
 }

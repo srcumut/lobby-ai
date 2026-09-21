@@ -63,3 +63,39 @@ pub async fn api_rate_limit_middleware(
     state.api_rate_limiter.check(&auth.user_id.to_string())?;
     Ok(next.run(request).await)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rate_limiter_allows_up_to_max() {
+        let limiter = RateLimiter::new(3, Duration::from_secs(60), "Rate limit exceeded");
+
+        assert!(limiter.check("user-1").is_ok());
+        assert!(limiter.check("user-1").is_ok());
+        assert!(limiter.check("user-1").is_ok());
+
+        // 4th request should be rate limited
+        let result = limiter.check("user-1");
+        assert!(result.is_err());
+        match result {
+            Err(AppError::TooManyRequests(msg)) => assert_eq!(msg, "Rate limit exceeded"),
+            _ => panic!("Expected TooManyRequests error"),
+        }
+    }
+
+    #[test]
+    fn test_rate_limiter_isolates_different_keys() {
+        let limiter = RateLimiter::new(2, Duration::from_secs(60), "Rate limit exceeded");
+
+        assert!(limiter.check("key-a").is_ok());
+        assert!(limiter.check("key-a").is_ok());
+        assert!(limiter.check("key-a").is_err());
+
+        // key-b should still be allowed
+        assert!(limiter.check("key-b").is_ok());
+        assert!(limiter.check("key-b").is_ok());
+        assert!(limiter.check("key-b").is_err());
+    }
+}

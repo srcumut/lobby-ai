@@ -58,3 +58,21 @@ pub async fn send_direct_message(
 
     Ok(Json(response))
 }
+
+pub async fn toggle_direct_message_reaction(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    Path(message_id): Path<Uuid>,
+    Json(payload): Json<crate::schemas::message::ReactionRequest>,
+) -> Result<Json<std::collections::HashMap<String, Vec<Uuid>>>, AppError> {
+    payload.validate().map_err(|e| AppError::Validation(e.to_string()))?;
+    let reactions = direct_message_service::toggle_reaction(
+        &state,
+        auth.user_id,
+        message_id,
+        &payload.reaction,
+    )
+    .await?;
+    Ok(Json(reactions))
+}
+

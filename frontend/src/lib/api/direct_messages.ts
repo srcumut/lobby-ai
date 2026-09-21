@@ -34,4 +34,15 @@ export const directMessagesApi = {
     });
     return response.data;
   },
+
+  toggleReaction: async (
+    messageId: string,
+    reaction: string
+  ): Promise<{ success: boolean; reactions: DirectMessage['reactions'] }> => {
+    const response = await apiClient.post<{ success: boolean; reactions: DirectMessage['reactions'] }>(
+      `/friends/messages/${messageId}/reactions`,
+      { reaction }
+    );
+    return response.data;
+  },
 };

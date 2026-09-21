@@ -14,13 +14,20 @@ pub struct MessageResponse {
 }
 
 #[derive(Debug, Deserialize, validator::Validate)]
+pub struct CreateMessageRequest {
+    #[validate(length(min = 1, max = 2000, message = "Message content must be between 1 and 2000 characters"))]
+    pub content: String,
+}
+
+#[derive(Debug, Deserialize, validator::Validate)]
 pub struct ReactionRequest {
     #[validate(length(min = 1, max = 50, message = "Reaction must be between 1 and 50 characters"))]
     pub reaction: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessageSender {
+
     pub id: Uuid,
     pub username: String,
     pub display_name: Option<String>,

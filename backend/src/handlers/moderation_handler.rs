@@ -16,9 +16,13 @@ pub async fn kick_user(
     State(state): State<SharedState>,
     auth: AuthenticatedUser,
     Path((lobby_id, user_id)): Path<(Uuid, Uuid)>,
-) -> Result<Json<()>, AppError> {
+) -> Result<Json<serde_json::Value>, AppError> {
     moderation_service::kick_user(&state, lobby_id, auth.user_id, user_id).await?;
-    Ok(Json(()))
+    Ok(Json(serde_json::json!({
+        "message": "User successfully kicked",
+        "lobby_id": lobby_id,
+        "user_id": user_id,
+    })))
 }
 
 pub async fn ban_user(
@@ -34,9 +38,13 @@ pub async fn unban_user(
     State(state): State<SharedState>,
     auth: AuthenticatedUser,
     Path((lobby_id, user_id)): Path<(Uuid, Uuid)>,
-) -> Result<Json<()>, AppError> {
+) -> Result<Json<serde_json::Value>, AppError> {
     moderation_service::unban_user(&state, lobby_id, auth.user_id, user_id).await?;
-    Ok(Json(()))
+    Ok(Json(serde_json::json!({
+        "message": "User successfully unbanned",
+        "lobby_id": lobby_id,
+        "user_id": user_id,
+    })))
 }
 
 pub async fn mute_user(
@@ -63,9 +71,13 @@ pub async fn unmute_user(
     State(state): State<SharedState>,
     auth: AuthenticatedUser,
     Path((lobby_id, user_id)): Path<(Uuid, Uuid)>,
-) -> Result<Json<()>, AppError> {
+) -> Result<Json<serde_json::Value>, AppError> {
     moderation_service::unmute_user(&state, lobby_id, auth.user_id, user_id).await?;
-    Ok(Json(()))
+    Ok(Json(serde_json::json!({
+        "message": "User successfully unmuted",
+        "lobby_id": lobby_id,
+        "user_id": user_id,
+    })))
 }
 
 pub async fn set_role(

@@ -79,40 +79,72 @@ impl AiProvider for OpenAiProvider {
             .build()
             .map_err(|e| AppError::Internal(format!("Failed to build reqwest client: {}", e)))?;
 
-        let res = client
-            .post("https://api.openai.com/v1/chat/completions")
-            .header("Authorization", format!("Bearer {}", plaintext_key))
-            .header("Content-Type", "application/json")
-            .json(&req_body)
-            .send()
-            .await;
+        let mut attempts = 0;
+        let max_attempts = 3;
+        let mut last_error_msg = String::new();
 
-        match res {
-            Ok(response) => {
-                if !response.status().is_success() {
+        while attempts < max_attempts {
+            attempts += 1;
+
+            let res = client
+                .post("https://api.openai.com/v1/chat/completions")
+                .header("Authorization", format!("Bearer {}", plaintext_key))
+                .header("Content-Type", "application/json")
+                .json(&req_body)
+                .send()
+                .await;
+
+            match res {
+                Ok(response) => {
                     let status = response.status();
-                    let text = response.text().await.unwrap_or_default();
-                    error!("OpenAI API error: {} - {}", status, text);
-                    return Err(AppError::Internal(format!("OpenAI API error: {}", status)));
+                    if status.is_success() {
+                        let ai_resp: OpenAiResponse = response
+                            .json()
+                            .await
+                            .map_err(|e| AppError::Internal(format!("Failed to parse OpenAI response: {}", e)))?;
+
+                        if let Some(choice) = ai_resp.choices.first() {
+                            if let Some(content) = &choice.message.content {
+                                return Ok(content.clone());
+                            }
+                        }
+
+                        return Err(AppError::Internal("No content returned from OpenAI".to_string()));
+                    }
+
+                    let status_code = status.as_u16();
+                    let error_text = response.text().await.unwrap_or_default();
+                    error!(
+                        "OpenAI API error (attempt {}/{}): {} - {}",
+                        attempts, max_attempts, status, error_text
+                    );
+                    last_error_msg = format!("OpenAI API error: {} - {}", status, error_text);
+
+                    // 503 Service Unavailable, 429 Too Many Requests, or 5xx server errors warrant retry
+                    if (status_code == 503 || status_code == 429 || status.is_server_error()) && attempts < max_attempts {
+                        let backoff_secs = attempts;
+                        tracing::warn!("Retrying OpenAI API call in {}s due to {}...", backoff_secs, status);
+                        tokio::time::sleep(Duration::from_secs(backoff_secs as u64)).await;
+                        continue;
+                    }
+
+                    return Err(AppError::Internal(last_error_msg));
                 }
-
-                let ai_resp: OpenAiResponse = response
-                    .json()
-                    .await
-                    .map_err(|e| AppError::Internal(format!("Failed to parse OpenAI response: {}", e)))?;
-
-                if let Some(choice) = ai_resp.choices.first() {
-                    if let Some(content) = &choice.message.content {
-                        return Ok(content.clone());
+                Err(e) => {
+                    error!(
+                        "OpenAI request failed (attempt {}/{}): {}",
+                        attempts, max_attempts, e
+                    );
+                    last_error_msg = format!("OpenAI request failed: {}", e);
+                    if attempts < max_attempts {
+                        let backoff_secs = attempts;
+                        tokio::time::sleep(Duration::from_secs(backoff_secs as u64)).await;
+                        continue;
                     }
                 }
-
-                Err(AppError::Internal("No content returned from OpenAI".to_string()))
-            }
-            Err(e) => {
-                error!("OpenAI request failed: {}", e);
-                Err(AppError::Internal(format!("OpenAI request failed: {}", e)))
             }
         }
+
+        Err(AppError::Internal(last_error_msg))
     }
 }

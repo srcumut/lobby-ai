@@ -21,4 +21,9 @@ export const authApi = {
     const response = await apiClient.get<UserInfo>('/users/me');
     return response.data;
   },
+
+  refreshToken: async (refresh_token: string): Promise<AuthResponse> => {
+    const response = await apiClient.post<AuthResponse>('/auth/refresh', { refresh_token });
+    return response.data;
+  },
 };

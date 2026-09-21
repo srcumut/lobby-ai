@@ -62,7 +62,7 @@ impl AiProvider for GeminiProvider {
         conversation_history: &[crate::models::message::Message],
         plaintext_key: &str,
     ) -> Result<String, AppError> {
-        let mut contents = Vec::new();
+        let mut contents: Vec<GeminiContent> = Vec::new();
 
         for msg in conversation_history {
             let role = if msg.sender_id == agent.user_id {
@@ -70,10 +70,37 @@ impl AiProvider for GeminiProvider {
             } else {
                 "user"
             };
+
+            // Gemini strictly requires alternating roles between 'user' and 'model'.
+            // Merge consecutive messages with the same role into a single turn.
+            if let Some(last) = contents.last_mut() {
+                if last.role == role {
+                    last.parts.push(GeminiPart {
+                        text: format!("\n{}", msg.content),
+                    });
+                    continue;
+                }
+            }
+
             contents.push(GeminiContent {
                 role: role.to_string(),
                 parts: vec![GeminiPart {
                     text: msg.content.clone(),
+                }],
+            });
+        }
+
+        // Gemini API strictly requires that the first content turn has role 'user'
+        while !contents.is_empty() && contents[0].role != "user" {
+            contents.remove(0);
+        }
+
+        // If history was empty or only had model turns, provide fallback user turn
+        if contents.is_empty() {
+            contents.push(GeminiContent {
+                role: "user".to_string(),
+                parts: vec![GeminiPart {
+                    text: "Merhaba!".to_string(),
                 }],
             });
         }
@@ -109,41 +136,73 @@ impl AiProvider for GeminiProvider {
             .build()
             .map_err(|e| AppError::Internal(format!("Failed to build reqwest client: {}", e)))?;
 
-        let res = client
-            .post(&url)
-            .header("Content-Type", "application/json")
-            .json(&req_body)
-            .send()
-            .await;
+        let mut attempts = 0;
+        let max_attempts = 3;
+        let mut last_error_msg = String::new();
 
-        match res {
-            Ok(response) => {
-                if !response.status().is_success() {
+        while attempts < max_attempts {
+            attempts += 1;
+
+            let res = client
+                .post(&url)
+                .header("Content-Type", "application/json")
+                .json(&req_body)
+                .send()
+                .await;
+
+            match res {
+                Ok(response) => {
                     let status = response.status();
-                    let text = response.text().await.unwrap_or_default();
-                    error!("Gemini API error: {} - {}", status, text);
-                    return Err(AppError::Internal(format!("Gemini API error: {}", status)));
-                }
+                    if status.is_success() {
+                        let ai_resp: GeminiResponse = response
+                            .json()
+                            .await
+                            .map_err(|e| AppError::Internal(format!("Failed to parse Gemini response: {}", e)))?;
 
-                let ai_resp: GeminiResponse = response
-                    .json()
-                    .await
-                    .map_err(|e| AppError::Internal(format!("Failed to parse Gemini response: {}", e)))?;
-
-                if let Some(candidates) = ai_resp.candidates {
-                    if let Some(candidate) = candidates.first() {
-                        if let Some(part) = candidate.content.parts.first() {
-                            return Ok(part.text.clone());
+                        if let Some(candidates) = ai_resp.candidates {
+                            if let Some(candidate) = candidates.first() {
+                                if let Some(part) = candidate.content.parts.first() {
+                                    return Ok(part.text.clone());
+                                }
+                            }
                         }
+
+                        return Err(AppError::Internal("No content returned from Gemini".to_string()));
+                    }
+
+                    let status_code = status.as_u16();
+                    let error_text = response.text().await.unwrap_or_default();
+                    error!(
+                        "Gemini API error (attempt {}/{}): {} - {}",
+                        attempts, max_attempts, status, error_text
+                    );
+                    last_error_msg = format!("Gemini API error: {} - {}", status, error_text);
+
+                    // 503 Service Unavailable, 429 Too Many Requests, or 5xx server errors warrant retry
+                    if (status_code == 503 || status_code == 429 || status.is_server_error()) && attempts < max_attempts {
+                        let backoff_secs = attempts;
+                        tracing::warn!("Retrying Gemini API call in {}s due to {}...", backoff_secs, status);
+                        tokio::time::sleep(Duration::from_secs(backoff_secs as u64)).await;
+                        continue;
+                    }
+
+                    return Err(AppError::Internal(last_error_msg));
+                }
+                Err(e) => {
+                    error!(
+                        "Gemini request failed (attempt {}/{}): {}",
+                        attempts, max_attempts, e
+                    );
+                    last_error_msg = format!("Gemini request failed: {}", e);
+                    if attempts < max_attempts {
+                        let backoff_secs = attempts;
+                        tokio::time::sleep(Duration::from_secs(backoff_secs as u64)).await;
+                        continue;
                     }
                 }
-
-                Err(AppError::Internal("No content returned from Gemini".to_string()))
-            }
-            Err(e) => {
-                error!("Gemini request failed: {}", e);
-                Err(AppError::Internal(format!("Gemini request failed: {}", e)))
             }
         }
+
+        Err(AppError::Internal(last_error_msg))
     }
 }

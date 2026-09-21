@@ -131,7 +131,7 @@ pub async fn get_conversations(
     let records = sqlx::query!(
         r#"
         SELECT 
-            u.id, u.username, u.email, u.display_name, u.avatar_url, u.bio, u.is_bot, u.created_at,
+            u.id, u.username, u.email, u.display_name, u.first_name, u.last_name, u.avatar_url, u.banner_url, u.bio, u.badges, u.is_bot, u.created_at, u.coins,
             m.id as "last_message_id?",
             m.sender_id as "last_message_sender_id?",
             m.receiver_id as "last_message_receiver_id?",
@@ -190,6 +190,7 @@ pub async fn get_conversations(
                     content,
                     is_read,
                     created_at,
+                    reactions: std::collections::HashMap::new(),
                 }),
                 _ => None,
             };
@@ -200,9 +201,14 @@ pub async fn get_conversations(
                     username: r.username,
                     email: r.email,
                     display_name: r.display_name,
+                    first_name: r.first_name,
+                    last_name: r.last_name,
                     avatar_url: r.avatar_url,
+                    banner_url: r.banner_url,
                     bio: r.bio,
+                    badges: r.badges,
                     is_bot: r.is_bot,
+                    coins: r.coins,
                     created_at: r.created_at,
                 },
                 last_message,
@@ -213,3 +219,104 @@ pub async fn get_conversations(
 
     Ok(conversations)
 }
+
+pub async fn get_direct_message_by_id(
+    pool: &PgPool,
+    message_id: Uuid,
+) -> Result<Option<DirectMessage>, AppError> {
+    let dm = sqlx::query_as::<_, DirectMessage>(
+        r#"
+        SELECT id, sender_id, receiver_id, content, is_read, created_at, updated_at, deleted_at
+        FROM direct_messages
+        WHERE id = $1 AND deleted_at IS NULL
+        "#,
+    )
+    .bind(message_id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(dm)
+}
+
+pub async fn toggle_reaction(
+    pool: &PgPool,
+    message_id: Uuid,
+    user_id: Uuid,
+    emoji: &str,
+) -> Result<bool, AppError> {
+    let existing = sqlx::query_scalar::<_, bool>(
+        r#"
+        SELECT EXISTS(
+            SELECT 1 FROM direct_message_reactions
+            WHERE direct_message_id = $1 AND user_id = $2 AND emoji = $3
+        )
+        "#,
+    )
+    .bind(message_id)
+    .bind(user_id)
+    .bind(emoji)
+    .fetch_one(pool)
+    .await?;
+
+    if existing {
+        sqlx::query(
+            r#"
+            DELETE FROM direct_message_reactions
+            WHERE direct_message_id = $1 AND user_id = $2 AND emoji = $3
+            "#,
+        )
+        .bind(message_id)
+        .bind(user_id)
+        .bind(emoji)
+        .execute(pool)
+        .await?;
+        Ok(false)
+    } else {
+        sqlx::query(
+            r#"
+            INSERT INTO direct_message_reactions (direct_message_id, user_id, emoji)
+            VALUES ($1, $2, $3)
+            ON CONFLICT DO NOTHING
+            "#,
+        )
+        .bind(message_id)
+        .bind(user_id)
+        .bind(emoji)
+        .execute(pool)
+        .await?;
+        Ok(true)
+    }
+}
+
+pub async fn get_reactions_for_messages(
+    pool: &PgPool,
+    message_ids: &[Uuid],
+) -> Result<std::collections::HashMap<Uuid, std::collections::HashMap<String, Vec<Uuid>>>, AppError> {
+    if message_ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    let records = sqlx::query!(
+        r#"
+        SELECT direct_message_id, user_id, emoji
+        FROM direct_message_reactions
+        WHERE direct_message_id = ANY($1)
+        ORDER BY created_at ASC
+        "#,
+        message_ids
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut map: std::collections::HashMap<Uuid, std::collections::HashMap<String, Vec<Uuid>>> = std::collections::HashMap::new();
+    for r in records {
+        map.entry(r.direct_message_id)
+            .or_default()
+            .entry(r.emoji)
+            .or_default()
+            .push(r.user_id);
+    }
+
+    Ok(map)
+}
+

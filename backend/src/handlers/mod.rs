@@ -7,3 +7,5 @@ pub mod user_handler;
 pub mod ai_handler;
 pub mod direct_message_handler;
 pub mod upload_handler;
+pub mod poll_handler;
+

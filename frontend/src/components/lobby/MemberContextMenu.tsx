@@ -5,6 +5,8 @@ import { LobbyMember } from "@/types";
 import { lobbiesApi } from "@/lib/api/lobbies";
 import { friendsApi } from "@/lib/api/friends";
 import { toast } from "@/components/ui/toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queryKeys";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,8 +43,11 @@ import {
   Ban, 
   ShieldCheck, 
   ShieldAlert, 
-  Loader2 
+  Loader2,
+  Swords,
+  Flag,
 } from "lucide-react";
+import { ReportUserModal } from "@/components/moderation/ReportUserModal";
 
 interface MemberContextMenuProps {
   member: LobbyMember;
@@ -52,7 +57,9 @@ interface MemberContextMenuProps {
   lobbyId: string;
   onOpenProfile: (userId: string) => void;
   onActionSuccess?: () => void;
+  onChallengeRps?: (targetId: string, targetUsername: string, isBot?: boolean) => void;
 }
+
 
 export function MemberContextMenu({
   member,
@@ -62,10 +69,12 @@ export function MemberContextMenu({
   lobbyId,
   onOpenProfile,
   onActionSuccess,
+  onChallengeRps,
 }: MemberContextMenuProps) {
   const isSelf = currentUserId === member.user_id;
   const isTargetOwner = member.role === "OWNER";
   const isTargetModerator = member.role === "MODERATOR";
+  const queryClient = useQueryClient();
   
   const canModerate = (isLobbyOwner || currentUserRole === "OWNER" || currentUserRole === "MODERATOR") && !isSelf && !isTargetOwner;
   // Only owners can moderate moderators or change roles
@@ -75,22 +84,24 @@ export function MemberContextMenu({
   const [confirmKickOpen, setConfirmKickOpen] = useState(false);
   const [confirmBanOpen, setConfirmBanOpen] = useState(false);
   const [muteDialogOpen, setMuteDialogOpen] = useState(false);
-  const [muteDuration, setMuteDuration] = useState<number | undefined>(15);
+  const [muteDuration, setMuteDuration] = useState<number | null>(15);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Friend Request Action
   const handleAddFriend = async () => {
     try {
       await friendsApi.sendFriendRequest({ username: member.username });
+      queryClient.invalidateQueries({ queryKey: queryKeys.friends.all });
       toast.add({
-        title: "Friend Request Sent",
-        description: `Sent a friend request to ${member.username}.`,
+        title: "Arkadaşlık İsteği Gönderildi",
+        description: `${member.username} kullanıcısına arkadaşlık isteği gönderildi.`,
         type: "success",
       });
     } catch (err: any) {
       toast.add({
-        title: "Error",
-        description: err.response?.data?.error?.message || "Failed to send friend request.",
+        title: "Hata",
+        description: err.response?.data?.error?.message || "Arkadaşlık isteği gönderilemedi.",
         type: "error",
       });
     }
@@ -101,17 +112,19 @@ export function MemberContextMenu({
     setIsSubmitting(true);
     try {
       await lobbiesApi.moderateUser(lobbyId, "kick", member.user_id);
+      queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.members(lobbyId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.detail(lobbyId) });
       toast.add({
-        title: "User Kicked",
-        description: `${member.username} was kicked from the lobby.`,
+        title: "Kullanıcı Atıldı",
+        description: `${member.username} lobiden çıkarıldı.`,
         type: "success",
       });
       setConfirmKickOpen(false);
       onActionSuccess?.();
     } catch (err: any) {
       toast.add({
-        title: "Kick Failed",
-        description: err.response?.data?.error?.message || "Failed to kick user.",
+        title: "Kullanıcı Atılamadı",
+        description: err.response?.data?.error?.message || "Kullanıcı atılırken bir hata oluştu.",
         type: "error",
       });
     } finally {
@@ -124,17 +137,20 @@ export function MemberContextMenu({
     setIsSubmitting(true);
     try {
       await lobbiesApi.moderateUser(lobbyId, "ban", member.user_id);
+      queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.members(lobbyId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.bans(lobbyId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.detail(lobbyId) });
       toast.add({
-        title: "User Banned",
-        description: `${member.username} was banned from the lobby.`,
+        title: "Kullanıcı Yasaklandı",
+        description: `${member.username} lobiden yasaklandı.`,
         type: "success",
       });
       setConfirmBanOpen(false);
       onActionSuccess?.();
     } catch (err: any) {
       toast.add({
-        title: "Ban Failed",
-        description: err.response?.data?.error?.message || "Failed to ban user.",
+        title: "Yasaklama Başarısız",
+        description: err.response?.data?.error?.message || "Kullanıcı yasaklanamadı.",
         type: "error",
       });
     } finally {
@@ -147,17 +163,41 @@ export function MemberContextMenu({
     setIsSubmitting(true);
     try {
       await lobbiesApi.moderateUser(lobbyId, "mute", member.user_id, muteDuration);
+      queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.members(lobbyId) });
       toast.add({
-        title: "User Muted",
-        description: `${member.username} has been muted.`,
+        title: "Kullanıcı Susturuldu",
+        description: `${member.username} susturuldu.`,
         type: "success",
       });
       setMuteDialogOpen(false);
       onActionSuccess?.();
     } catch (err: any) {
       toast.add({
-        title: "Mute Failed",
-        description: err.response?.data?.error?.message || "Failed to mute user.",
+        title: "Susturma Başarısız",
+        description: err.response?.data?.error?.message || "Kullanıcı susturulamadı.",
+        type: "error",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Unmute Action
+  const handleUnmute = async () => {
+    setIsSubmitting(true);
+    try {
+      await lobbiesApi.moderateUser(lobbyId, "unmute", member.user_id);
+      queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.members(lobbyId) });
+      toast.add({
+        title: "Kullanıcı Susturması Kaldırıldı",
+        description: `${member.username} kullanıcısının susturması kaldırıldı.`,
+        type: "success",
+      });
+      onActionSuccess?.();
+    } catch (err: any) {
+      toast.add({
+        title: "İşlem Başarısız",
+        description: err.response?.data?.error?.message || "Susturma kaldırılamadı.",
         type: "error",
       });
     } finally {
@@ -170,16 +210,17 @@ export function MemberContextMenu({
     const newRole = isTargetModerator ? "MEMBER" : "MODERATOR";
     try {
       await lobbiesApi.setMemberRole(lobbyId, member.user_id, newRole);
+      queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.members(lobbyId) });
       toast.add({
-        title: "Role Updated",
-        description: `${member.username} is now a ${newRole}.`,
+        title: "Rol Güncellendi",
+        description: `${member.username} kullanıcısının yeni rolü: ${newRole === "MODERATOR" ? "Moderatör" : "Üye"}.`,
         type: "success",
       });
       onActionSuccess?.();
     } catch (err: any) {
       toast.add({
-        title: "Failed to Update Role",
-        description: err.response?.data?.error?.message || "Could not change role.",
+        title: "Rol Güncellenemedi",
+        description: err.response?.data?.error?.message || "Kullanıcı rolü değiştirilemedi.",
         type: "error",
       });
     }
@@ -194,7 +235,7 @@ export function MemberContextMenu({
               variant="ghost"
               size="icon"
               className="h-7 w-7 p-0 text-gray-500 hover:text-black hover:bg-black/10 rounded-sm cursor-pointer"
-              title="Member Options"
+              title="Üye Seçenekleri"
               onClick={(e) => e.stopPropagation()}
             >
               <MoreVertical className="w-4 h-4" />
@@ -213,8 +254,8 @@ export function MemberContextMenu({
             onClick={() => onOpenProfile(member.user_id)}
           >
             <User className="w-4 h-4 text-black" />
-            <span>View Profile</span>
-            {isSelf && <span className="ml-auto text-[10px] text-gray-400">(You)</span>}
+            <span>Profili Görüntüle</span>
+            {isSelf && <span className="ml-auto text-[10px] text-gray-400">(Sen)</span>}
           </DropdownMenuItem>
 
           {/* Add Friend (Only for other humans) */}
@@ -224,9 +265,22 @@ export function MemberContextMenu({
               onClick={handleAddFriend}
             >
               <UserPlus className="w-4 h-4 text-blue-600" />
-              <span>Add Friend</span>
+              <span>Arkadaş Ekle</span>
             </DropdownMenuItem>
           )}
+
+
+          {/* 1v1 RPS Challenge */}
+          {!isSelf && onChallengeRps && (
+            <DropdownMenuItem
+              className="flex items-center gap-2 p-2 hover:bg-[#FEF08A] cursor-pointer rounded-none font-bold text-black"
+              onClick={() => onChallengeRps(member.user_id, member.username, member.is_bot)}
+            >
+              <span className="text-sm">✊</span>
+              <span>{member.is_bot ? "✊ Ajanla Taş-Kağıt-Makas" : "✊ Taş-Kağıt-Makas Oyna"}</span>
+            </DropdownMenuItem>
+          )}
+
 
           {/* Moderation Actions */}
           {canModerate && (
@@ -240,19 +294,28 @@ export function MemberContextMenu({
                   onClick={handleToggleRole}
                 >
                   <ShieldCheck className="w-4 h-4 text-purple-600" />
-                  <span>{isTargetModerator ? "Demote to Member" : "Make Moderator"}</span>
+                  <span>{isTargetModerator ? "Üyeliğe Düşür" : "Moderatör Yap"}</span>
                 </DropdownMenuItem>
               )}
 
               {/* Mute (not applicable to bots) */}
               {!member.is_bot && (
-                <DropdownMenuItem
-                  className="flex items-center gap-2 p-2 hover:bg-amber-50 text-amber-900 cursor-pointer rounded-none font-bold"
-                  onClick={() => setMuteDialogOpen(true)}
-                >
-                  <MicOff className="w-4 h-4 text-amber-600" />
-                  <span>Mute User...</span>
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem
+                    className="flex items-center gap-2 p-2 hover:bg-amber-50 text-amber-900 cursor-pointer rounded-none font-bold"
+                    onClick={() => setMuteDialogOpen(true)}
+                  >
+                    <MicOff className="w-4 h-4 text-amber-600" />
+                    <span>Kullanıcıyı Sustur...</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="flex items-center gap-2 p-2 hover:bg-green-50 text-green-700 cursor-pointer rounded-none font-bold"
+                    onClick={handleUnmute}
+                  >
+                    <Mic className="w-4 h-4 text-green-600" />
+                    <span>Susturmayı Kaldır</span>
+                  </DropdownMenuItem>
+                </>
               )}
 
               {/* Kick */}
@@ -261,7 +324,7 @@ export function MemberContextMenu({
                 onClick={() => setConfirmKickOpen(true)}
               >
                 <UserMinus className="w-4 h-4 text-red-600" />
-                <span>Kick from Lobby</span>
+                <span>Lobiden At</span>
               </DropdownMenuItem>
 
               {/* Ban */}
@@ -270,7 +333,21 @@ export function MemberContextMenu({
                 onClick={() => setConfirmBanOpen(true)}
               >
                 <Ban className="w-4 h-4 text-red-600" />
-                <span>Ban from Lobby</span>
+                <span>Lobiden Yasakla</span>
+              </DropdownMenuItem>
+            </>
+          )}
+
+          {/* Report User Action */}
+          {!isSelf && (
+            <>
+              <DropdownMenuSeparator className="my-1 border-t-2 border-black" />
+              <DropdownMenuItem
+                className="flex items-center gap-2 p-2 hover:bg-red-50 text-red-600 cursor-pointer rounded-none font-bold"
+                onClick={() => setReportModalOpen(true)}
+              >
+                <Flag className="w-4 h-4 text-red-600" />
+                <span>Kullanıcıyı Şikayet Et</span>
               </DropdownMenuItem>
             </>
           )}
@@ -283,19 +360,19 @@ export function MemberContextMenu({
           <DialogHeader>
             <DialogTitle className="text-xl font-black uppercase flex items-center gap-2">
               <MicOff className="w-5 h-5 text-amber-600" />
-              Mute {member.username}
+              {member.username} Kullanıcısını Sustur
             </DialogTitle>
             <DialogDescription className="font-bold text-black/80 text-xs">
-              Select how long this user should be prevented from sending messages in this lobby.
+              Bu kullanıcının lobide mesaj yazmasının ne kadar süreyle engelleneceğini seçin.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-2 py-3">
             {[
-              { label: "5 Minutes", value: 5 },
-              { label: "15 Minutes", value: 15 },
-              { label: "1 Hour", value: 60 },
-              { label: "Indefinite (Until unmuted)", value: undefined },
+              { label: "5 Dakika", value: 5 },
+              { label: "15 Dakika", value: 15 },
+              { label: "1 Saat", value: 60 },
+              { label: "Süresiz (Kaldırılana Kadar)", value: null },
             ].map((option) => (
               <button
                 key={option.label}
@@ -318,17 +395,17 @@ export function MemberContextMenu({
               variant="outline"
               size="sm"
               onClick={() => setMuteDialogOpen(false)}
-              className="bg-white border-2 border-black font-black uppercase"
+              className="bg-white border-2 border-black font-black uppercase cursor-pointer"
             >
-              Cancel
+              İptal
             </Button>
             <Button
               size="sm"
               onClick={handleMute}
               disabled={isSubmitting}
-              className="bg-amber-500 hover:bg-amber-600 text-black border-2 border-black font-black uppercase shadow-[2px_2px_0_0_rgba(0,0,0,1)]"
+              className="bg-amber-500 hover:bg-amber-600 text-black border-2 border-black font-black uppercase shadow-[2px_2px_0_0_rgba(0,0,0,1)] cursor-pointer"
             >
-              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirm Mute"}
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Susturmayı Onayla"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -340,18 +417,18 @@ export function MemberContextMenu({
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-black uppercase flex items-center gap-2">
               <UserMinus className="w-5 h-5 text-red-600" />
-              Kick {member.username}?
+              {member.username} Lobiden Atılsın mı?
             </AlertDialogTitle>
             <AlertDialogDescription className="font-bold text-black/80 text-xs">
-              The user will be removed from the lobby immediately. If the lobby is public, they may re-join.
+              Kullanıcı lobiden derhal çıkarılacaktır. Lobi herkese açıksa tekrar katılabilir.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 pt-2">
             <AlertDialogCancel 
               disabled={isSubmitting}
-              className="font-black uppercase bg-white border-2 border-black"
+              className="font-black uppercase bg-white border-2 border-black cursor-pointer"
             >
-              Cancel
+              İptal
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
@@ -359,9 +436,9 @@ export function MemberContextMenu({
                 handleKick();
               }}
               disabled={isSubmitting}
-              className="font-black uppercase bg-red-600 hover:bg-red-700 text-white border-2 border-black"
+              className="font-black uppercase bg-red-600 hover:bg-red-700 text-white border-2 border-black cursor-pointer"
             >
-              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Yes, Kick"}
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Evet, Lobiden At"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -373,18 +450,18 @@ export function MemberContextMenu({
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-black uppercase flex items-center gap-2">
               <Ban className="w-5 h-5 text-red-600" />
-              Ban {member.username}?
+              {member.username} Lobiden Yasaklansın mı?
             </AlertDialogTitle>
             <AlertDialogDescription className="font-bold text-black/80 text-xs">
-              This user will be permanently banned from this lobby and cannot re-enter unless unbanned by an administrator.
+              Bu kullanıcı lobiden kalıcı olarak yasaklanacak ve bir yönetici yasağı kaldırmadığı sürece tekrar katılamayacaktır.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 pt-2">
             <AlertDialogCancel 
               disabled={isSubmitting}
-              className="font-black uppercase bg-white border-2 border-black"
+              className="font-black uppercase bg-white border-2 border-black cursor-pointer"
             >
-              Cancel
+              İptal
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
@@ -392,13 +469,26 @@ export function MemberContextMenu({
                 handleBan();
               }}
               disabled={isSubmitting}
-              className="font-black uppercase bg-red-600 hover:bg-red-700 text-white border-2 border-black"
+              className="font-black uppercase bg-red-600 hover:bg-red-700 text-white border-2 border-black cursor-pointer"
             >
-              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Yes, Ban User"}
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Evet, Kullanıcıyı Yasakla"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Report User Dialog */}
+      <ReportUserModal
+        isOpen={reportModalOpen}
+        onClose={() => setReportModalOpen(false)}
+        targetUser={{
+          id: member.user_id,
+          username: member.username,
+          display_name: member.display_name,
+          avatar_url: member.avatar_url,
+        }}
+        lobbyId={lobbyId}
+      />
     </>
   );
 }

@@ -19,6 +19,8 @@ export function useDirectMessages(initialFriendId?: string | null) {
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [partnerIsTyping, setPartnerIsTyping] = useState(false);
+  const partnerTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const activeFriendIdRef = useRef<string | null>(activeFriendId);
   activeFriendIdRef.current = activeFriendId;
@@ -56,13 +58,15 @@ export function useDirectMessages(initialFriendId?: string | null) {
       );
     } catch (err: any) {
       console.error("Failed to load messages", err);
-      setError(err.response?.data?.error?.message || "Failed to load messages");
+      setError(err.response?.data?.error?.message || "Mesajlar yüklenemedi");
     } finally {
       setIsLoadingMessages(false);
     }
   }, []);
 
   useEffect(() => {
+    setPartnerIsTyping(false);
+    if (partnerTypingTimeoutRef.current) clearTimeout(partnerTypingTimeoutRef.current);
     if (activeFriendId && isAuthenticated) {
       loadMessages(activeFriendId);
     } else {
@@ -70,7 +74,7 @@ export function useDirectMessages(initialFriendId?: string | null) {
     }
   }, [activeFriendId, isAuthenticated, loadMessages]);
 
-  // Listen to real-time incoming DMs from global WebSocket
+  // Listen to real-time incoming DMs and typing events from global WebSocket
   useEffect(() => {
     const handleDirectMessage = (e: Event) => {
       const customEvent = e as CustomEvent<DirectMessage>;
@@ -86,6 +90,8 @@ export function useDirectMessages(initialFriendId?: string | null) {
           if (prev.some((m) => m.id === newMsg.id)) return prev;
           return [...prev, newMsg];
         });
+        // Clear typing indicator since new message arrived
+        setPartnerIsTyping(false);
       }
 
       // Update conversations list with the new last message
@@ -111,16 +117,62 @@ export function useDirectMessages(initialFriendId?: string | null) {
       });
     };
 
+    const handleDirectMessageTyping = (e: Event) => {
+      const customEvent = e as CustomEvent<{ sender_id: string; is_typing: boolean }>;
+      const { sender_id, is_typing } = customEvent.detail || {};
+      if (sender_id && activeFriendIdRef.current === sender_id) {
+        setPartnerIsTyping(Boolean(is_typing));
+        if (partnerTypingTimeoutRef.current) clearTimeout(partnerTypingTimeoutRef.current);
+        if (is_typing) {
+          partnerTypingTimeoutRef.current = setTimeout(() => {
+            setPartnerIsTyping(false);
+          }, 3500);
+        }
+      }
+    };
+
+    const handleDirectMessageReaction = (e: Event) => {
+      const customEvent = e as CustomEvent<{ message_id: string; reactions: DirectMessage['reactions'] }>;
+      const { message_id, reactions } = customEvent.detail || {};
+      if (message_id && reactions) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === message_id ? { ...m, reactions } : m))
+        );
+      }
+    };
+
     window.addEventListener("lobby-ai:direct-message", handleDirectMessage);
+    window.addEventListener("lobby-ai:direct-message-typing", handleDirectMessageTyping);
+    window.addEventListener("lobby-ai:direct-message-reaction", handleDirectMessageReaction);
     return () => {
       window.removeEventListener("lobby-ai:direct-message", handleDirectMessage);
+      window.removeEventListener("lobby-ai:direct-message-typing", handleDirectMessageTyping);
+      window.removeEventListener("lobby-ai:direct-message-reaction", handleDirectMessageReaction);
     };
   }, [user?.id, fetchConversations]);
+
+  // Send typing event over global WebSocket
+  const sendTyping = useCallback((isTyping: boolean) => {
+    if (!activeFriendId || typeof window === "undefined") return;
+    window.dispatchEvent(
+      new CustomEvent("lobby-ai:send-global-ws", {
+        detail: {
+          type: "direct_message.typing",
+          event_type: "direct_message.typing",
+          payload: {
+            receiver_id: activeFriendId,
+            is_typing: isTyping,
+          },
+        },
+      })
+    );
+  }, [activeFriendId]);
 
   // Send a direct message
   const sendMessage = async (content: string) => {
     if (!activeFriendId || !content.trim() || isSending) return;
     setIsSending(true);
+    sendTyping(false);
     try {
       const newMsg = await directMessagesApi.sendMessage(activeFriendId, content.trim());
       setMessages((prev) => {
@@ -143,6 +195,20 @@ export function useDirectMessages(initialFriendId?: string | null) {
     }
   };
 
+  // Toggle a reaction on a direct message
+  const toggleReaction = async (messageId: string, reaction: string) => {
+    try {
+      const res = await directMessagesApi.toggleReaction(messageId, reaction);
+      if (res && res.reactions) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, reactions: res.reactions } : m))
+        );
+      }
+    } catch (err: any) {
+      console.error("Failed to toggle reaction", err);
+    }
+  };
+
   return {
     conversations,
     activeFriendId,
@@ -151,8 +217,11 @@ export function useDirectMessages(initialFriendId?: string | null) {
     isLoadingConversations,
     isLoadingMessages,
     isSending,
+    partnerIsTyping,
+    sendTyping,
     error,
     sendMessage,
+    toggleReaction,
     refreshConversations: fetchConversations,
   };
 }

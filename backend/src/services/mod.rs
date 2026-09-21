@@ -7,3 +7,4 @@ pub mod user_service;
 pub mod ai_service;
 pub mod upload_service;
 pub mod direct_message_service;
+pub mod poll_service;

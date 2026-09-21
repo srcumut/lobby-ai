@@ -122,4 +122,48 @@ pub struct InviteUserRequest {
     pub user_id: Option<Uuid>,
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_notification_preference_validation() {
+        assert!(validate_notification_preference("ALL").is_ok());
+        assert!(validate_notification_preference("MENTIONS_ONLY").is_ok());
+        assert!(validate_notification_preference("MUTE").is_ok());
+
+        assert!(validate_notification_preference("INVALID").is_err());
+        assert!(validate_notification_preference("").is_err());
+        assert!(validate_notification_preference("all").is_err());
+    }
+
+    #[test]
+    fn test_create_lobby_request_validation() {
+        let valid_req = CreateLobbyRequest {
+            name: "Gaming Room".to_string(),
+            description: Some("Fun games".to_string()),
+            is_private: Some(false),
+            password: None,
+        };
+        assert!(valid_req.validate().is_ok());
+
+        let empty_name_req = CreateLobbyRequest {
+            name: "".to_string(),
+            description: None,
+            is_private: None,
+            password: None,
+        };
+        assert!(empty_name_req.validate().is_err());
+
+        let too_long_name = CreateLobbyRequest {
+            name: "a".repeat(101),
+            description: None,
+            is_private: None,
+            password: None,
+        };
+        assert!(too_long_name.validate().is_err());
+    }
+}
+
+
 

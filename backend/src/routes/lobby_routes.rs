@@ -5,6 +5,7 @@ use axum::{
 
 use crate::handlers::lobby_handler;
 use crate::handlers::message_handler;
+use crate::handlers::poll_handler;
 use crate::state::SharedState;
 
 pub fn routes() -> Router<SharedState> {
@@ -17,20 +18,35 @@ pub fn routes() -> Router<SharedState> {
         .route("/api/lobbies/{id}/members", get(lobby_handler::get_members))
         .route("/api/lobbies/{id}/bans", get(lobby_handler::get_banned_users))
         .route("/api/lobbies/{id}/bots", post(lobby_handler::add_bot_to_lobby))
+        .route("/api/lobbies/{id}/agents/{agent_id}/initiate", post(lobby_handler::initiate_agent_chat))
         .route("/api/lobbies/{id}/join", post(lobby_handler::join_lobby))
         .route("/api/lobbies/{id}/leave", post(lobby_handler::leave_lobby))
         .route(
             "/api/lobbies/{id}/notifications",
-            axum::routing::put(lobby_handler::update_notification_preference),
+            axum::routing::put(lobby_handler::update_notification_preference)
+                .get(lobby_handler::get_notification_preference),
         )
         .route(
             "/api/lobbies/{id}/messages",
-            get(message_handler::get_messages),
+            get(message_handler::get_messages).post(message_handler::create_message),
         )
         .route(
             "/api/lobbies/{id}/messages/{message_id}/reactions",
             post(message_handler::toggle_reaction),
         )
+        .route(
+            "/api/lobbies/{id}/polls",
+            get(poll_handler::list_polls).post(poll_handler::create_poll),
+        )
+        .route(
+            "/api/lobbies/{id}/polls/{poll_id}/vote",
+            post(poll_handler::vote_poll),
+        )
+        .route(
+            "/api/lobbies/{id}/polls/{poll_id}/close",
+            post(poll_handler::close_poll),
+        )
+
         .route(
             "/api/lobbies/{id}/moderation/kick/{user_id}",
             post(crate::handlers::moderation_handler::kick_user),

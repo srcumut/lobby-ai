@@ -37,8 +37,9 @@ pub async fn create_notification(
 pub async fn get_user_notifications(
     state: &SharedState,
     user_id: Uuid,
+    include_all: bool,
 ) -> Result<Vec<NotificationResponse>, AppError> {
-    let notifications = notification_repository::get_user_notifications(&state.db, user_id).await?;
+    let notifications = notification_repository::get_user_notifications(&state.db, user_id, include_all).await?;
 
     let responses = notifications
         .into_iter()
@@ -60,12 +61,27 @@ pub async fn mark_as_read(
     state: &SharedState,
     user_id: Uuid,
     id: Uuid,
-) -> Result<(), AppError> {
-    let success = notification_repository::mark_as_read(&state.db, id, user_id).await?;
-    if !success {
-        return Err(AppError::NotFound("Notification not found".to_string()));
-    }
-    Ok(())
+) -> Result<NotificationResponse, AppError> {
+    let notification = notification_repository::mark_as_read(&state.db, id, user_id).await?
+        .ok_or_else(|| AppError::NotFound("Notification not found".to_string()))?;
+
+    let response = NotificationResponse {
+        id: notification.id,
+        r#type: notification.r#type,
+        title: notification.title,
+        message: notification.message,
+        related_entity_id: notification.related_entity_id,
+        is_read: notification.is_read,
+        created_at: notification.created_at,
+    };
+
+    let event = WsOutgoingEvent {
+        event_type: "notification.read".to_string(),
+        payload: serde_json::to_value(&response).unwrap_or_default(),
+    };
+    state.global_ws_manager.send_to_user(user_id, event).await;
+
+    Ok(response)
 }
 
 pub async fn mark_all_as_read(
@@ -73,5 +89,14 @@ pub async fn mark_all_as_read(
     user_id: Uuid,
 ) -> Result<(), AppError> {
     notification_repository::mark_all_as_read(&state.db, user_id).await?;
+
+    let event = WsOutgoingEvent {
+        event_type: "notification.all_read".to_string(),
+        payload: serde_json::json!({
+            "user_id": user_id,
+        }),
+    };
+    state.global_ws_manager.send_to_user(user_id, event).await;
+
     Ok(())
 }

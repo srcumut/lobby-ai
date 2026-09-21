@@ -41,7 +41,7 @@ export function Header() {
                 <div className="bg-white p-1 rounded-sm brutal-border group-hover:-translate-y-1 group-hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all">
                   <Compass className="w-5 h-5 text-black" />
                 </div>
-                <span className="hidden sm:inline">Rooms</span>
+                <span className="hidden sm:inline">Odalar</span>
               </Link>
               <Link href="/profile" className="flex items-center gap-2 font-bold px-3 py-1.5 bg-[#4ADE80] brutal-border shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:shadow-[4px_4px_0_0_rgba(0,0,0,1)] rounded-md hover:-translate-y-1 transition-all text-black group cursor-pointer">
                 {user?.avatar_url ? (
@@ -53,29 +53,29 @@ export function Header() {
                 ) : (
                   <User className="w-5 h-5" />
                 )}
-                <span className="hidden md:inline">Hi, {user?.display_name || user?.username}</span>
+                <span className="hidden md:inline">Selam, {user?.display_name || user?.username}</span>
               </Link>
             </div>
             <AlertDialog>
               <AlertDialogTrigger render={
                 <Button variant="secondary" className="bg-[#F472B6] hover:bg-[#db2777] text-black font-black brutal-border shadow-[4px_4px_0_0_rgba(0,0,0,1)] uppercase hover:-translate-y-1 hover:shadow-[6px_6px_0_0_rgba(0,0,0,1)] transition-all cursor-pointer">
                   <LogOut className="w-4 h-4 mr-2" />
-                  Log Out
+                  Çıkış Yap
                 </Button>
               } />
               <AlertDialogContent className="brutal-border brutal-shadow bg-[#FEF08A]">
                 <AlertDialogHeader>
-                  <AlertDialogTitle className="text-3xl font-black uppercase">Leaving so soon?</AlertDialogTitle>
+                  <AlertDialogTitle className="text-3xl font-black uppercase">Ayrılıyor musunuz?</AlertDialogTitle>
                   <AlertDialogDescription className="font-bold text-black/80 text-lg">
-                    Are you sure you want to log out of your account?
+                    Hesabınızdan çıkış yapmak istediğinize emin misiniz?
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter className="mt-4">
                   <AlertDialogCancel className="font-black bg-white text-black brutal-border hover:bg-gray-100 uppercase cursor-pointer">
-                    Cancel
+                    İptal
                   </AlertDialogCancel>
                   <AlertDialogAction onClick={logout} className="font-black bg-[#4ADE80] text-black brutal-border hover:bg-[#22c55e] brutal-shadow hover:translate-y-[1px] hover:translate-x-[1px] shadow-[4px_4px_0_0_rgba(0,0,0,1)] uppercase cursor-pointer">
-                    Yes, Log Out
+                    Evet, Çıkış Yap
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -86,13 +86,13 @@ export function Header() {
             <Link href="/login">
               <Button variant="outline" className="bg-white text-black font-black brutal-border shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:-translate-y-1 hover:shadow-[6px_6px_0_0_rgba(0,0,0,1)] transition-all uppercase cursor-pointer">
                 <LogIn className="w-4 h-4 mr-2" />
-                Log In
+                Giriş Yap
               </Button>
             </Link>
             <Link href="/register">
               <Button variant="default" className="bg-[#4ADE80] text-black font-black brutal-border shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:bg-[#22c55e] hover:-translate-y-1 hover:shadow-[6px_6px_0_0_rgba(0,0,0,1)] transition-all uppercase cursor-pointer">
                 <UserPlus className="w-4 h-4 mr-2" />
-                Sign Up
+                Kayıt Ol
               </Button>
             </Link>
           </div>

@@ -17,20 +17,20 @@ export function Footer() {
             </div>
           </div>
           <p className="font-bold text-black/70 text-sm mt-2">
-            © {new Date().getFullYear()} Lobby AI. All rights reserved.
+            © {new Date().getFullYear()} Lobby AI. Tüm hakları saklıdır.
           </p>
         </div>
 
         {/* Center: Links */}
         <div className="flex flex-wrap justify-center gap-6 font-black uppercase text-sm">
           <Link href="/lobbies" className="hover:underline hover:text-[#A78BFA] transition-colors cursor-pointer">
-            Explore Rooms
+            Odaları Keşfet
           </Link>
           <Link href="#" className="hover:underline hover:text-[#4ADE80] transition-colors cursor-pointer">
-            About Us
+            Hakkımızda
           </Link>
           <Link href="#" className="hover:underline hover:text-[#F472B6] transition-colors cursor-pointer">
-            Privacy Policy
+            Gizlilik Politikası
           </Link>
         </div>
 

@@ -19,6 +19,8 @@ pub struct DirectMessageResponse {
     pub content: String,
     pub is_read: bool,
     pub created_at: DateTime<Utc>,
+    #[serde(default)]
+    pub reactions: std::collections::HashMap<String, Vec<Uuid>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

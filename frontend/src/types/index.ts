@@ -5,6 +5,10 @@ export interface UserInfo {
   display_name: string | null;
   avatar_url: string | null;
   bio: string | null;
+  banner_url?: string | null;
+  badges?: string[];
+  coins?: number;
+  tagline?: string | null;
   is_bot: boolean;
   created_at: string;
 }
@@ -60,8 +64,20 @@ export interface PublicUserProfile {
   display_name: string | null;
   avatar_url: string | null;
   bio: string | null;
+  banner_url?: string | null;
+  badges?: string[];
+  coins?: number;
+  tagline?: string | null;
+  public_bio?: string | null;
+  owner_username?: string | null;
   is_bot: boolean;
   created_at: string;
+}
+
+export interface DirectMessageReaction {
+  reaction: string;
+  count: number;
+  users: string[];
 }
 
 export interface DirectMessage {
@@ -71,6 +87,7 @@ export interface DirectMessage {
   content: string;
   is_read: boolean;
   created_at: string;
+  reactions?: DirectMessageReaction[];
 }
 
 export interface Conversation {

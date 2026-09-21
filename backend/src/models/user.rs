@@ -11,8 +11,15 @@ pub struct User {
     #[serde(skip_serializing)]
     pub password_hash: String,
     pub display_name: Option<String>,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
     pub avatar_url: Option<String>,
+    pub banner_url: Option<String>,
     pub bio: Option<String>,
+    #[sqlx(default)]
+    pub badges: Vec<String>,
+    #[sqlx(default)]
+    pub coins: i32,
     pub is_bot: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,

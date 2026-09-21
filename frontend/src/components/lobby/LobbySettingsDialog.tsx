@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { MoreVertical, MicOff, Mic, UserMinus, Ban, UserCheck, UserPlus, Check, X, Loader2, Send, Mail } from "lucide-react";
+import { MoreVertical, MicOff, Mic, UserMinus, Ban, UserCheck, UserPlus, Check, X, Loader2, Send, Mail, Shield } from "lucide-react";
 import { lobbiesApi } from "@/lib/api/lobbies";
 import { aiApi } from "@/lib/api/ai";
 import { friendsApi } from "@/lib/api/friends";
+import { getAvatarUrl } from "@/lib/avatar";
+import { toast } from "@/components/ui/toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queryKeys";
 import { LobbyMember, BannedUser, Lobby, Agent, JoinRequest, UserInfo } from "@/types";
 
 interface LobbySettingsDialogProps {
@@ -22,6 +26,7 @@ interface LobbySettingsDialogProps {
 }
 
 export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUserId, onUserProfileClick, onLobbyUpdated, onMembersUpdated }: LobbySettingsDialogProps) {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("members");
   
   const [members, setMembers] = useState<LobbyMember[]>([]);
@@ -53,6 +58,80 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
   const [inviteInput, setInviteInput] = useState("");
   const [inviting, setInviting] = useState(false);
   const [inviteMsg, setInviteMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  // Bot Interaction Settings State
+  const [editingBotForPermissions, setEditingBotForPermissions] = useState<Agent | null>(null);
+  const [selectedInteractionMode, setSelectedInteractionMode] = useState<"EVERYONE" | "OWNER_ONLY" | "MODERATORS" | "WHITELIST">("EVERYONE");
+  const [whitelistUsersInput, setWhitelistUsersInput] = useState<string>("");
+  const [isSavingBotPermissions, setIsSavingBotPermissions] = useState<boolean>(false);
+
+  const handleOpenBotPermissions = (bot: Agent) => {
+    setEditingBotForPermissions(bot);
+    const rawBehavior = (bot.behavior_config as any) || {};
+    const allowed: string[] = rawBehavior?.permissions?.allowed_users || rawBehavior?.allowed_users || [];
+    const mode = (rawBehavior?.interaction_mode || rawBehavior?.permissions?.interaction_mode || (allowed.length > 0 ? "WHITELIST" : (bot as any).allow_user_interaction !== false ? "EVERYONE" : "OWNER_ONLY")) as any;
+    setSelectedInteractionMode(mode);
+    setWhitelistUsersInput(allowed.join(", "));
+  };
+
+  const handleSaveBotPermissions = async () => {
+    if (!editingBotForPermissions) return;
+    setIsSavingBotPermissions(true);
+    try {
+      const rawBehavior = ((editingBotForPermissions.behavior_config as any) || {});
+      const allowedUsersList = selectedInteractionMode === "WHITELIST" 
+        ? whitelistUsersInput.split(",").map(u => u.trim().replace(/^@/, "")).filter(Boolean)
+        : [];
+
+      const updatedBehavior = {
+        ...rawBehavior,
+        interaction_mode: selectedInteractionMode,
+        allowed_users: allowedUsersList,
+        permissions: {
+          ...(rawBehavior.permissions || {}),
+          interaction_mode: selectedInteractionMode,
+          allowed_users: allowedUsersList,
+        }
+      };
+
+      await aiApi.updateAgent(editingBotForPermissions.id, {
+        name: editingBotForPermissions.name,
+        provider: editingBotForPermissions.provider,
+        model: editingBotForPermissions.model,
+        behavior_config: updatedBehavior,
+        allow_user_interaction: selectedInteractionMode === "EVERYONE",
+        permissions: {
+          can_initiate_chat: editingBotForPermissions.permissions?.can_initiate_chat ?? false,
+          can_talk_to_agents: editingBotForPermissions.permissions?.can_talk_to_agents ?? false,
+          allow_public_usage: selectedInteractionMode === "EVERYONE",
+          interaction_mode: selectedInteractionMode,
+          allowed_users: allowedUsersList,
+        },
+      });
+
+      toast.add({
+        title: "Yetkiler Güncellendi",
+        description: `${editingBotForPermissions.name} botunun lobi içi etkileşim yetkileri başarıyla güncellendi.`,
+        type: "success",
+      });
+
+      // Update in availableBots list
+      setAvailableBots(prev => prev.map(b => b.id === editingBotForPermissions.id ? {
+        ...b,
+        behavior_config: updatedBehavior,
+        allow_user_interaction: selectedInteractionMode === "EVERYONE",
+      } : b));
+
+      setEditingBotForPermissions(null);
+    } catch (err: any) {
+      toast.add({
+        title: "Güncelleme Başarısız",
+        description: err.response?.data?.error?.message || "Bot yetkileri güncellenemedi.",
+        type: "error",
+      });
+    } finally {
+      setIsSavingBotPermissions(false);
+    }
+  };
 
   useEffect(() => {
     if (members.length > 0 && currentUserId) {
@@ -110,8 +189,17 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
       setRequests(prev => prev.filter(r => r.user_id !== userId));
       fetchMembers();
       if (onMembersUpdated) onMembersUpdated();
+      toast.add({
+        title: "İstek Onaylandı",
+        description: "Kullanıcı lobiye katıldı.",
+        type: "success",
+      });
     } catch (err: any) {
-      alert(`Failed to approve request: ${err.response?.data?.error?.message || "Unknown error"}`);
+      toast.add({
+        title: "İstek Onaylanamadı",
+        description: err.response?.data?.error?.message || "Bilinmeyen bir hata oluştu.",
+        type: "error",
+      });
     } finally {
       setProcessingRequestId(null);
     }
@@ -123,8 +211,17 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
     try {
       await lobbiesApi.rejectJoinRequest(lobby.id, userId);
       setRequests(prev => prev.filter(r => r.user_id !== userId));
+      toast.add({
+        title: "İstek Reddedildi",
+        description: "Katılma isteği reddedildi.",
+        type: "info",
+      });
     } catch (err: any) {
-      alert(`Failed to reject request: ${err.response?.data?.error?.message || "Unknown error"}`);
+      toast.add({
+        title: "İşlem Başarısız",
+        description: err.response?.data?.error?.message || "İstek reddedilemedi.",
+        type: "error",
+      });
     } finally {
       setProcessingRequestId(null);
     }
@@ -136,10 +233,10 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
     setInviteMsg(null);
     try {
       await lobbiesApi.inviteUser(lobby.id, { username, user_id: userId });
-      setInviteMsg({ text: `Invitation sent to ${username || "user"} successfully!`, type: "success" });
+      setInviteMsg({ text: `${username || "Kullanıcıya"} davet başarıyla gönderildi!`, type: "success" });
       if (username === inviteInput) setInviteInput("");
     } catch (err: any) {
-      setInviteMsg({ text: err.response?.data?.error?.message || "Failed to send invitation", type: "error" });
+      setInviteMsg({ text: err.response?.data?.error?.message || "Davet gönderilemedi", type: "error" });
     } finally {
       setInviting(false);
     }
@@ -183,11 +280,24 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
     }
   };
 
-  const handleModeration = async (action: 'kick' | 'mute' | 'unmute' | 'ban' | 'unban', targetUserId: string, durationMinutes?: number) => {
+  const handleModeration = async (action: 'kick' | 'mute' | 'unmute' | 'ban' | 'unban', targetUserId: string, durationMinutes?: number | null) => {
     if (!lobby) return;
     try {
       await lobbiesApi.moderateUser(lobby.id, action, targetUserId, durationMinutes);
-      alert(`User has been ${action}ed successfully.`);
+      queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.members(lobby.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.bans(lobby.id) });
+      const actionLabels: Record<string, string> = {
+        kick: "lobiden atıldı",
+        ban: "lobiden yasaklandı",
+        unban: "yasağı kaldırıldı",
+        mute: "susturuldu",
+        unmute: "susturması kaldırıldı",
+      };
+      toast.add({
+        title: "Moderasyon Başarılı",
+        description: `Kullanıcı başarıyla ${actionLabels[action] || action}.`,
+        type: "success",
+      });
       if (action === 'kick' || action === 'ban') {
         fetchMembers(); // refresh list
       }
@@ -196,7 +306,11 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
       }
     } catch (e: any) {
       console.error("Moderation error:", e.response?.data || e);
-      alert(`Failed to ${action} user: ${e.response?.data?.error?.message || "Unknown error"}`);
+      toast.add({
+        title: "İşlem Başarısız",
+        description: e.response?.data?.error?.message || "Moderasyon işlemi gerçekleştirilemedi.",
+        type: "error",
+      });
     }
   };
 
@@ -205,11 +319,21 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
     setUpdatingSettings(true);
     try {
       const updated = await lobbiesApi.updateLobby(lobby.id, name, description);
+      queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.detail(lobby.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.all });
       onLobbyUpdated(updated);
-      alert("Lobby updated successfully.");
+      toast.add({
+        title: "Lobi Güncellendi",
+        description: "Lobi ayarları başarıyla kaydedildi.",
+        type: "success",
+      });
     } catch (e: any) {
       console.error("Failed to update lobby", e);
-      alert("Failed to update lobby.");
+      toast.add({
+        title: "Güncelleme Başarısız",
+        description: "Lobi güncellenirken bir hata oluştu.",
+        type: "error",
+      });
     } finally {
       setUpdatingSettings(false);
     }
@@ -223,9 +347,18 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
       setNotificationPreference(pref);
       setMembers(prev => prev.map(m => m.user_id === currentUserId ? { ...m, notification_preference: pref } : m));
       if (onMembersUpdated) onMembersUpdated();
+      toast.add({
+        title: "Bildirim Ayarı Kaydedildi",
+        description: "Lobi bildirim tercihiniz güncellendi.",
+        type: "success",
+      });
     } catch (e: any) {
       console.error("Failed to update notification preference", e);
-      alert("Bildirim ayarı güncellenemedi.");
+      toast.add({
+        title: "Hata",
+        description: "Bildirim ayarı güncellenemedi.",
+        type: "error",
+      });
     } finally {
       setUpdatingNotification(false);
     }
@@ -236,14 +369,22 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
     setAddingBot(botUserId);
     try {
       await lobbiesApi.addBotToLobby(lobby.id, botUserId);
-      alert("Bot successfully added to the lobby.");
+      toast.add({
+        title: "Bot Eklendi",
+        description: "AI botu lobiye başarıyla katıldı.",
+        type: "success",
+      });
       fetchMembers(); // refresh internal state
       if (onMembersUpdated) {
         onMembersUpdated();
       }
     } catch (e: any) {
       console.error("Failed to add bot", e);
-      alert(`Failed to add bot: ${e.response?.data?.error?.message || "Unknown error"}`);
+      toast.add({
+        title: "Bot Eklenemedi",
+        description: e.response?.data?.error?.message || "Bot lobiye eklenirken hata oluştu.",
+        type: "error",
+      });
     } finally {
       setAddingBot(null);
     }
@@ -253,29 +394,37 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="brutal-border shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] bg-yellow-50 max-w-lg min-h-[60vh] flex flex-col">
+      <DialogContent className="brutal-border shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] bg-yellow-50 w-[95vw] max-w-2xl h-[720px] max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-black">Lobby Settings</DialogTitle>
+          <DialogTitle className="text-2xl font-black">Lobi Ayarları</DialogTitle>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-          <TabsList className="flex flex-wrap w-full brutal-border bg-white mb-4">
-            <TabsTrigger value="members" className="font-bold border-2 border-transparent data-[state=active]:border-black data-[state=active]:bg-yellow-300">
-              Members ({lobby?.member_count || 0})
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 min-w-0 w-full max-w-full overflow-hidden">
+          <TabsList 
+            className="flex flex-nowrap overflow-x-auto no-scrollbar scroll-smooth h-auto min-h-0 w-full max-w-full justify-start brutal-border bg-white mb-4 p-1.5 gap-1.5 items-center shrink-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:h-0"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            onWheel={(e) => {
+              if (e.deltaY !== 0) {
+                e.currentTarget.scrollLeft += e.deltaY;
+              }
+            }}
+          >
+            <TabsTrigger value="members" className="h-auto shrink-0 flex-none whitespace-nowrap font-black text-xs uppercase px-3.5 py-2 border-2 border-transparent data-[state=active]:border-black data-[state=active]:bg-[#FEF08A] data-[state=active]:shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:bg-gray-100 cursor-pointer transition-all rounded-sm">
+              Üyeler ({lobby?.member_count || 0})
             </TabsTrigger>
             {canModerate && (
-              <TabsTrigger value="bans" className="font-bold border-2 border-transparent data-[state=active]:border-black data-[state=active]:bg-yellow-300">
-                Bans
+              <TabsTrigger value="bans" className="h-auto shrink-0 flex-none whitespace-nowrap font-black text-xs uppercase px-3.5 py-2 border-2 border-transparent data-[state=active]:border-black data-[state=active]:bg-[#FEF08A] data-[state=active]:shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:bg-gray-100 cursor-pointer transition-all rounded-sm">
+                Yasaklar {bans.length > 0 && `(${bans.length})`}
               </TabsTrigger>
             )}
             {canModerate && (
-              <TabsTrigger value="bots" className="font-bold border-2 border-transparent data-[state=active]:border-black data-[state=active]:bg-yellow-300">
-                Bots
+              <TabsTrigger value="bots" className="h-auto shrink-0 flex-none whitespace-nowrap font-black text-xs uppercase px-3.5 py-2 border-2 border-transparent data-[state=active]:border-black data-[state=active]:bg-[#FEF08A] data-[state=active]:shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:bg-gray-100 cursor-pointer transition-all rounded-sm">
+                Botlar
               </TabsTrigger>
             )}
             {canModerate && (
-              <TabsTrigger value="requests" className="font-bold border-2 border-transparent data-[state=active]:border-black data-[state=active]:bg-yellow-300 relative">
-                Requests {requests.length > 0 && (
+              <TabsTrigger value="requests" className="h-auto shrink-0 flex-none whitespace-nowrap font-black text-xs uppercase px-3.5 py-2 border-2 border-transparent data-[state=active]:border-black data-[state=active]:bg-[#FEF08A] data-[state=active]:shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:bg-gray-100 cursor-pointer transition-all rounded-sm relative">
+                İstekler {requests.length > 0 && (
                   <span className="bg-[#EF4444] text-white text-[10px] px-1.5 py-0.2 rounded-full ml-1 font-black animate-pulse">
                     {requests.length}
                   </span>
@@ -283,23 +432,23 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
               </TabsTrigger>
             )}
             {canModerate && (
-              <TabsTrigger value="invite" className="font-bold border-2 border-transparent data-[state=active]:border-black data-[state=active]:bg-yellow-300">
-                Invite
+              <TabsTrigger value="invite" className="h-auto shrink-0 flex-none whitespace-nowrap font-black text-xs uppercase px-3.5 py-2 border-2 border-transparent data-[state=active]:border-black data-[state=active]:bg-[#FEF08A] data-[state=active]:shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:bg-gray-100 cursor-pointer transition-all rounded-sm">
+                Davet Et
               </TabsTrigger>
             )}
             {myRole === 'OWNER' && (
-              <TabsTrigger value="settings" className="font-bold border-2 border-transparent data-[state=active]:border-black data-[state=active]:bg-yellow-300">
-                Settings
+              <TabsTrigger value="settings" className="h-auto shrink-0 flex-none whitespace-nowrap font-black text-xs uppercase px-3.5 py-2 border-2 border-transparent data-[state=active]:border-black data-[state=active]:bg-[#FEF08A] data-[state=active]:shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:bg-gray-100 cursor-pointer transition-all rounded-sm">
+                Ayarlar
               </TabsTrigger>
             )}
-            <TabsTrigger value="notifications" className="font-bold border-2 border-transparent data-[state=active]:border-black data-[state=active]:bg-yellow-300">
-              Notifications
+            <TabsTrigger value="notifications" className="h-auto shrink-0 flex-none whitespace-nowrap font-black text-xs uppercase px-3.5 py-2 border-2 border-transparent data-[state=active]:border-black data-[state=active]:bg-[#FEF08A] data-[state=active]:shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:bg-gray-100 cursor-pointer transition-all rounded-sm">
+              Bildirimler
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="members" className="flex-1 overflow-y-auto">
             {loadingMembers ? (
-              <p className="text-center font-bold">Loading...</p>
+              <p className="text-center font-bold">Yükleniyor...</p>
             ) : (
               <div className="space-y-3">
                 {members.map(member => (
@@ -308,8 +457,8 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
                       className="flex items-center gap-3 cursor-pointer"
                       onClick={() => onUserProfileClick(member.user_id)}
                     >
-                      <Avatar className="w-10 h-10 border-2 border-black">
-                        <AvatarImage src={member.avatar_url || ""} />
+                      <Avatar className="w-10 h-10 border-2 border-black shrink-0">
+                        <AvatarImage src={getAvatarUrl(member.avatar_url)} />
                         <AvatarFallback className="bg-pink-300 font-bold">
                           {member.display_name?.charAt(0).toUpperCase() || member.username.charAt(0).toUpperCase()}
                         </AvatarFallback>
@@ -323,25 +472,28 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
                     {canModerate && member.role !== 'OWNER' && (
                       <DropdownMenu>
                         <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 p-0 rounded-md hover:bg-black/10 text-black/50 hover:text-black transition-colors outline-none focus:ring-2 focus:ring-black">
-                          <span className="sr-only">Open menu</span>
+                          <span className="sr-only">Menüyü aç</span>
                           <MoreVertical className="h-4 w-4" />
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] w-48">
-                          <DropdownMenuItem onClick={() => handleModeration('mute', member.user_id, 15)} className="text-orange-600 focus:bg-orange-100 cursor-pointer">
-                            <MicOff className="mr-2 h-4 w-4" /> Mute 15m
+                        <DropdownMenuContent align="end" className="brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] w-52">
+                          <DropdownMenuItem onClick={() => handleModeration('mute', member.user_id, 15)} className="text-orange-600 focus:bg-orange-100 cursor-pointer font-bold">
+                            <MicOff className="mr-2 h-4 w-4" /> 15 dk Sustur
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleModeration('mute', member.user_id, 60)} className="text-orange-600 focus:bg-orange-100 cursor-pointer">
-                            <MicOff className="mr-2 h-4 w-4" /> Mute 1h
+                          <DropdownMenuItem onClick={() => handleModeration('mute', member.user_id, 60)} className="text-orange-600 focus:bg-orange-100 cursor-pointer font-bold">
+                            <MicOff className="mr-2 h-4 w-4" /> 1 sa Sustur
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleModeration('unmute', member.user_id)} className="text-green-600 focus:bg-green-100 cursor-pointer">
-                            <Mic className="mr-2 h-4 w-4" /> Unmute
+                          <DropdownMenuItem onClick={() => handleModeration('mute', member.user_id, null)} className="text-red-600 font-bold focus:bg-red-100 cursor-pointer">
+                            <MicOff className="mr-2 h-4 w-4" /> Süresiz Mute (Perma)
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleModeration('unmute', member.user_id)} className="text-green-600 focus:bg-green-100 cursor-pointer font-bold">
+                            <Mic className="mr-2 h-4 w-4" /> Susturmayı Kaldır
                           </DropdownMenuItem>
                           <DropdownMenuSeparator className="bg-black" />
-                          <DropdownMenuItem onClick={() => handleModeration('kick', member.user_id)} className="text-red-600 focus:bg-red-100 cursor-pointer">
-                            <UserMinus className="mr-2 h-4 w-4" /> Kick
+                          <DropdownMenuItem onClick={() => handleModeration('kick', member.user_id)} className="text-red-600 focus:bg-red-100 cursor-pointer font-bold">
+                            <UserMinus className="mr-2 h-4 w-4" /> Lobiden At
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleModeration('ban', member.user_id)} className="text-red-800 focus:bg-red-200 cursor-pointer">
-                            <Ban className="mr-2 h-4 w-4" /> Ban
+                          <DropdownMenuItem onClick={() => handleModeration('ban', member.user_id)} className="text-red-800 focus:bg-red-200 cursor-pointer font-bold">
+                            <Ban className="mr-2 h-4 w-4" /> Lobiden Yasakla
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -355,16 +507,16 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
           {canModerate && (
             <TabsContent value="bans" className="flex-1 overflow-y-auto">
               {loadingBans ? (
-                <p className="text-center font-bold">Loading...</p>
+                <p className="text-center font-bold">Yükleniyor...</p>
               ) : bans.length === 0 ? (
-                <p className="text-center font-bold text-gray-600 mt-8">No banned users.</p>
+                <p className="text-center font-bold text-gray-600 mt-8">Yasaklanan kullanıcı bulunmuyor.</p>
               ) : (
                 <div className="space-y-3">
                   {bans.map(ban => (
                     <div key={ban.user_id} className="flex items-center justify-between p-2 bg-red-50 brutal-border border-red-500">
                       <div className="flex items-center gap-3 cursor-pointer" onClick={() => onUserProfileClick(ban.user_id)}>
-                        <Avatar className="w-10 h-10 border-2 border-black">
-                          <AvatarImage src={ban.avatar_url || ""} />
+                        <Avatar className="w-10 h-10 border-2 border-black shrink-0">
+                          <AvatarImage src={getAvatarUrl(ban.avatar_url)} />
                           <AvatarFallback className="bg-red-300 font-bold">
                             {ban.display_name?.charAt(0).toUpperCase() || ban.username.charAt(0).toUpperCase()}
                           </AvatarFallback>
@@ -372,7 +524,7 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
                         <div>
                           <p className="font-bold">{ban.display_name || ban.username}</p>
                           <p className="text-xs font-bold text-red-600">
-                            Banned on {new Date(ban.banned_at).toLocaleDateString()}
+                            Yasaklandı: {new Date(ban.banned_at).toLocaleDateString("tr-TR")}
                           </p>
                         </div>
                       </div>
@@ -382,7 +534,7 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
                         className="bg-green-500 hover:bg-green-600 text-black border-2 border-black font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all"
                       >
                         <UserCheck className="mr-2 h-4 w-4" />
-                        Unban
+                        Yasağı Kaldır
                       </Button>
                     </div>
                   ))}
@@ -392,74 +544,269 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
           )}
 
           {canModerate && (
-            <TabsContent value="bots" className="flex-1 overflow-y-auto">
-              <div className="mb-4">
-                <p className="text-sm font-bold text-gray-700">Available AI Agents</p>
-                <p className="text-xs text-gray-500">You can invite any AI agent you created into this lobby.</p>
+            <TabsContent value="bots" className="flex-1 overflow-y-auto pr-1">
+              <div className="mb-4 bg-white p-3 brutal-border flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-black uppercase text-black">Lobideki AI Ajanları & Botlar</p>
+                  <p className="text-xs text-gray-600 font-bold">Oluşturduğunuz yapay zeka ajanlarını bu lobiye davet edebilir veya moderasyon yapabilirsiniz.</p>
+                </div>
               </div>
               {loadingBots ? (
-                <p className="text-center font-bold">Loading bots...</p>
+                <p className="text-center font-bold py-8">Yükleniyor...</p>
               ) : availableBots.length === 0 ? (
-                <p className="text-center font-bold text-gray-600">You haven't created any AI agents yet.</p>
+                <div className="text-center py-12 bg-white brutal-border">
+                  <p className="font-bold text-gray-600">Henüz bir AI ajanı oluşturmadınız.</p>
+                  <p className="text-xs text-gray-500 mt-1">Ajan Oluşturucu sekmesinden yeni bir bot oluşturup lobiye ekleyebilirsiniz.</p>
+                </div>
               ) : (
                 <div className="space-y-3">
                   {availableBots.map(bot => {
-                    // Check if bot is already a member
                     const isMember = members.some(m => m.user_id === bot.user_id);
+                    const isBanned = bans.some(b => b.user_id === bot.user_id);
+                    const rawBehavior = (bot.behavior_config as any) || {};
+                    const allowedUsers: string[] = rawBehavior?.permissions?.allowed_users || rawBehavior?.allowed_users || [];
+                    const mode: string = rawBehavior?.interaction_mode || rawBehavior?.permissions?.interaction_mode || (allowedUsers.length > 0 ? "WHITELIST" : (bot as any).allow_user_interaction !== false ? "EVERYONE" : "OWNER_ONLY");
+                    const isBotOwner = bot.owner_id === currentUserId;
+                    const canManageBot = isBotOwner || myRole === 'OWNER';
+                    
                     return (
-                      <div key={bot.id} className="flex items-center justify-between p-2 bg-blue-50 brutal-border border-blue-500">
-                        <div>
-                          <p className="font-bold">{bot.name}</p>
-                          <p className="text-xs text-gray-500">@{bot.username || bot.name.toLowerCase().replace(/\s+/g, '_')}</p>
+                      <div 
+                        key={bot.id} 
+                        className={`p-3 brutal-border transition-all ${
+                          isBanned 
+                            ? 'bg-red-50 border-red-500' 
+                            : isMember 
+                            ? 'bg-green-50/70 border-green-600' 
+                            : 'bg-white border-black'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="w-11 h-11 border-2 border-black shrink-0">
+                              <AvatarImage src={getAvatarUrl(bot.avatar_url)} />
+                              <AvatarFallback className="bg-purple-300 font-bold">
+                                {bot.name.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-black text-sm">{bot.name}</p>
+                                <span className="text-xs font-bold text-gray-500">@{bot.username || bot.name.toLowerCase().replace(/\s+/g, '_')}</span>
+                                {isBanned && (
+                                  <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded border border-black uppercase tracking-wider">
+                                    Yasaklandı (BANNED)
+                                  </span>
+                                )}
+                                {isMember && !isBanned && (
+                                  <span className="bg-green-600 text-white text-[10px] font-black px-2 py-0.5 rounded border border-black uppercase tracking-wider">
+                                    Lobide Aktif
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs font-bold text-gray-600 mt-0.5">
+                                Sağlayıcı: <span className="text-black uppercase">{bot.provider}</span> • Model: <span className="text-black font-semibold">{bot.model}</span>
+                              </p>
+                              {mode === "OWNER_ONLY" ? (
+                                <p className="text-xs font-bold text-amber-800 mt-1 flex items-center gap-1">
+                                  🔒 Sadece Bot Sahibi Kullanabilir
+                                </p>
+                              ) : mode === "MODERATORS" ? (
+                                <p className="text-xs font-bold text-blue-800 mt-1 flex items-center gap-1">
+                                  🛡️ Lobi Yöneticileri & Bot Sahibi
+                                </p>
+                              ) : mode === "WHITELIST" && allowedUsers.length > 0 ? (
+                                <p className="text-xs font-bold text-indigo-700 mt-1 flex items-center gap-1">
+                                  📋 Yetkili Kullanıcılar ({allowedUsers.length}): @{allowedUsers.join(", @")}
+                                </p>
+                              ) : (
+                                <p className="text-[11px] font-medium text-gray-500 mt-1 flex items-center gap-1">
+                                  🌐 Herkes bu botla sohbet edebilir
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="shrink-0 flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                            {canManageBot && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleOpenBotPermissions(bot)}
+                                className="bg-yellow-300 hover:bg-yellow-400 text-black border-2 border-black font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer text-xs flex items-center gap-1"
+                              >
+                                <Shield className="w-3.5 h-3.5" />
+                                Yetkileri Ayarla
+                              </Button>
+                            )}
+
+                            {isBanned ? (
+                              <div className="flex flex-col items-end gap-1">
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => handleModeration('unban', bot.user_id)}
+                                  className="bg-green-500 hover:bg-green-600 text-black border-2 border-black font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer text-xs"
+                                >
+                                  <UserCheck className="mr-1.5 h-3.5 w-3.5" /> Yasağı Kaldır
+                                </Button>
+                                <span className="text-[10px] text-red-600 font-bold">Lobiye eklemek için önce yasağı kaldırın</span>
+                              </div>
+                            ) : (
+                              <Button 
+                                size="sm" 
+                                onClick={() => handleAddBot(bot.user_id)}
+                                disabled={isMember || addingBot === bot.user_id}
+                                className={`border-2 border-black font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                                  isMember ? 'bg-gray-200 text-gray-600' : 'bg-blue-400 hover:bg-blue-500 text-black hover:-translate-y-[1px]'
+                                }`}
+                              >
+                                {addingBot === bot.user_id ? "Ekleniyor..." : (isMember ? "Lobide Mevcut" : "Lobiye Ekle")}
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                        <Button 
-                          size="sm" 
-                          onClick={() => handleAddBot(bot.user_id)}
-                          disabled={isMember || addingBot === bot.user_id}
-                          className="bg-blue-400 hover:bg-blue-500 text-black border-2 border-black font-bold shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {addingBot === bot.user_id ? "Adding..." : (isMember ? "Added" : "Add")}
-                        </Button>
                       </div>
                     );
                   })}
                 </div>
               )}
+
+              {/* Bot Interaction Permissions Modal */}
+              {editingBotForPermissions && (
+                <Dialog open={!!editingBotForPermissions} onOpenChange={(open) => !open && setEditingBotForPermissions(null)}>
+                  <DialogContent className="sm:max-w-md bg-white brutal-border border-4 p-5 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+                    <DialogHeader>
+                      <DialogTitle className="text-xl font-black uppercase flex items-center gap-2">
+                        <Shield className="w-5 h-5 text-indigo-600" />
+                        {editingBotForPermissions.name} - Etkileşim Yetkileri
+                      </DialogTitle>
+                      <DialogDescription className="text-xs font-bold text-gray-600">
+                        Bu bot lobideyken chat içinde kimlerin @mention atarak yanıt alabileceğini belirleyin.
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-2.5 py-3">
+                      {[
+                        {
+                          id: "EVERYONE",
+                          title: "Herkes",
+                          desc: "Lobideki tüm kullanıcılar bu botu etiketleyip yanıt alabilir.",
+                        },
+                        {
+                          id: "OWNER_ONLY",
+                          title: "Sadece Ben (Bot Sahibi)",
+                          desc: "Yalnızca siz botu etiketlediğinizde yanıt verir; diğer kullanıcılar yanıt alamaz.",
+                        },
+                        {
+                          id: "MODERATORS",
+                          title: "Lobi Yöneticileri ve Sahibi",
+                          desc: "Lobi kurucusu, moderatörler ve siz bota mention atabilirsiniz.",
+                        },
+                        {
+                          id: "WHITELIST",
+                          title: "Belirli Kullanıcılar (Beyaz Liste)",
+                          desc: "Sadece aşağıda belirteceğiniz kullanıcılar bota mention atabilir.",
+                        },
+                      ].map((opt) => (
+                        <label
+                          key={opt.id}
+                          onClick={() => setSelectedInteractionMode(opt.id as any)}
+                          className={`flex items-start gap-3 p-3 border-2 border-black cursor-pointer transition-all ${
+                            selectedInteractionMode === opt.id
+                              ? "bg-[#FEF08A] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                              : "bg-white hover:bg-gray-50"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="interaction_mode"
+                            checked={selectedInteractionMode === opt.id}
+                            onChange={() => setSelectedInteractionMode(opt.id as any)}
+                            className="mt-1 accent-black"
+                          />
+                          <div>
+                            <p className="font-black text-xs uppercase">{opt.title}</p>
+                            <p className="text-[11px] font-medium text-gray-600">{opt.desc}</p>
+                          </div>
+                        </label>
+                      ))}
+
+                      {selectedInteractionMode === "WHITELIST" && (
+                        <div className="mt-2 p-3 bg-gray-50 border-2 border-black space-y-1">
+                          <label className="text-xs font-black uppercase block">
+                            Yetkili Kullanıcı Adları (Virgülle ayırın)
+                          </label>
+                          <input
+                            type="text"
+                            value={whitelistUsersInput}
+                            onChange={(e) => setWhitelistUsersInput(e.target.value)}
+                            placeholder="örn: ahmet, mehmet, zeynep"
+                            className="w-full text-xs font-bold p-2 border-2 border-black bg-white focus:outline-none"
+                          />
+                          <p className="text-[10px] text-gray-500 font-bold">
+                            Kullanıcı adlarını başında @ olmadan veya @ ile yazabilirsiniz.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t-2 border-black">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setEditingBotForPermissions(null)}
+                        className="border-2 border-black font-bold text-xs"
+                      >
+                        İptal
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleSaveBotPermissions}
+                        disabled={isSavingBotPermissions}
+                        className="bg-green-500 hover:bg-green-600 text-black border-2 border-black font-black text-xs shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer"
+                      >
+                        {isSavingBotPermissions ? "Kaydediliyor..." : "Yetkileri Kaydet"}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
             </TabsContent>
           )}
 
           {myRole === 'OWNER' && (
-            <TabsContent value="settings" className="flex-1">
+            <TabsContent value="settings" className="flex-1 overflow-y-auto">
               <div className="space-y-4 bg-white p-4 brutal-border">
                 <div>
-                  <label className="block font-black mb-1">Lobby Name</label>
+                  <label className="block font-black mb-1">Lobi Adı</label>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    autoComplete="off"
                     className="w-full border-2 border-black p-2 font-bold focus:outline-none focus:ring-2 focus:ring-blue-400"
                   />
                 </div>
                 <div>
-                  <label className="block font-black mb-1">Description</label>
+                  <label className="block font-black mb-1">Açıklama</label>
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
+                    autoComplete="off"
                     className="w-full border-2 border-black p-2 font-bold min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-400"
                   />
                 </div>
                 <Button 
                   onClick={handleUpdateLobby} 
                   disabled={updatingSettings}
-                  className="w-full brutal-btn bg-green-400 hover:bg-green-500 text-black cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all"
+                  className="w-full brutal-btn bg-green-400 hover:bg-green-500 text-black cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all font-black uppercase"
                 >
-                  {updatingSettings ? "Saving..." : "Save Settings"}
+                  {updatingSettings ? "Kaydediliyor..." : "Ayarları Kaydet"}
                 </Button>
               </div>
             </TabsContent>
           )}
 
-          <TabsContent value="notifications" className="flex-1">
+          <TabsContent value="notifications" className="flex-1 overflow-y-auto">
             <div className="space-y-4 bg-white p-5 brutal-border">
               <div>
                 <h4 className="font-black text-base uppercase mb-1">Sohbet Bildirim Ayarları</h4>
@@ -542,26 +889,26 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
             <TabsContent value="requests" className="flex-1 overflow-y-auto">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-black text-sm uppercase">Join Requests ({requests.length})</h3>
+                  <h3 className="font-black text-sm uppercase">Katılma İstekleri ({requests.length})</h3>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={fetchRequests}
                     disabled={loadingRequests}
-                    className="h-7 text-xs font-black border-2 border-black"
+                    className="h-7 text-xs font-black border-2 border-black cursor-pointer"
                   >
-                    Refresh
+                    Yenile
                   </Button>
                 </div>
 
                 {loadingRequests ? (
                   <div className="p-8 text-center font-bold text-gray-500">
                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-black" />
-                    Loading requests...
+                    İstekler yükleniyor...
                   </div>
                 ) : requests.length === 0 ? (
                   <div className="p-8 text-center text-gray-400 font-bold text-sm bg-white brutal-border border-2">
-                    No pending join requests for this lobby.
+                    Bu lobi için bekleyen katılma isteği bulunmuyor.
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -584,7 +931,7 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
                               {req.display_name || req.username}
                             </p>
                             <p className="text-xs font-bold text-gray-500 truncate">
-                              @{req.username} • {new Date(req.created_at).toLocaleDateString()}
+                              @{req.username} • {new Date(req.created_at).toLocaleDateString("tr-TR")}
                             </p>
                           </div>
                         </div>
@@ -596,7 +943,7 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
                             disabled={processingRequestId === req.user_id}
                             className="bg-[#4ADE80] hover:bg-[#22c55e] text-black border-2 border-black font-black text-xs h-8 px-2.5 shadow-[1px_1px_0_0_rgba(0,0,0,1)] cursor-pointer"
                           >
-                            <Check className="w-3.5 h-3.5 mr-1" /> Approve
+                            <Check className="w-3.5 h-3.5 mr-1" /> Onayla
                           </Button>
                           <Button
                             size="sm"
@@ -604,7 +951,7 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
                             disabled={processingRequestId === req.user_id}
                             className="bg-[#FFE4E6] hover:bg-red-200 text-red-700 border-2 border-black font-black text-xs h-8 px-2.5 shadow-[1px_1px_0_0_rgba(0,0,0,1)] cursor-pointer"
                           >
-                            <X className="w-3.5 h-3.5 mr-1" /> Reject
+                            <X className="w-3.5 h-3.5 mr-1" /> Reddet
                           </Button>
                         </div>
                       </div>
@@ -619,22 +966,24 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
             <TabsContent value="invite" className="flex-1 overflow-y-auto space-y-4">
               {/* By Username */}
               <div className="p-4 bg-white brutal-border border-2 shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
-                <h3 className="font-black text-sm uppercase mb-1">Invite by Username</h3>
+                <h3 className="font-black text-sm uppercase mb-1">Kullanıcı Adı ile Davet Et</h3>
                 <p className="text-xs font-bold text-gray-500 mb-3">
-                  Invite any user directly to this lobby. They will be pre-approved to enter.
+                  Herhangi bir kullanıcıyı doğrudan bu lobiye davet edin. Katılmaları için ön onay sağlanacaktır.
                 </p>
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
                     if (inviteInput.trim()) handleSendInvite(inviteInput.trim());
                   }}
+                  autoComplete="off"
                   className="flex gap-2"
                 >
                   <input
                     value={inviteInput}
                     onChange={(e) => setInviteInput(e.target.value)}
-                    placeholder="Enter username..."
+                    placeholder="Kullanıcı adı girin..."
                     disabled={inviting}
+                    autoComplete="off"
                     className="flex-1 px-3 py-1.5 bg-gray-50 border-2 border-black font-bold text-sm outline-none focus:bg-white shadow-inner"
                   />
                   <Button
@@ -642,7 +991,7 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
                     disabled={!inviteInput.trim() || inviting}
                     className="bg-[#FEF08A] hover:bg-[#fde047] text-black border-2 border-black font-black text-xs uppercase shadow-[2px_2px_0_0_rgba(0,0,0,1)] cursor-pointer"
                   >
-                    {inviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <> <Send className="w-3.5 h-3.5 mr-1" /> Invite </>}
+                    {inviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <> <Send className="w-3.5 h-3.5 mr-1" /> Davet Et </>}
                   </Button>
                 </form>
 
@@ -659,19 +1008,19 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
 
               {/* Quick Invite from Friends */}
               <div className="p-4 bg-white brutal-border border-2 shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
-                <h3 className="font-black text-sm uppercase mb-1">Quick Invite Friends</h3>
+                <h3 className="font-black text-sm uppercase mb-1">Arkadaşları Hızlı Davet Et</h3>
                 <p className="text-xs font-bold text-gray-500 mb-3">
-                  Easily invite your accepted friends to this lobby.
+                  Ekli arkadaşlarınızı doğrudan bu lobiye davet edin.
                 </p>
 
                 {loadingFriends ? (
                   <div className="p-4 text-center font-bold text-gray-400">
                     <Loader2 className="w-5 h-5 animate-spin mx-auto mb-1 text-black" />
-                    Loading friends...
+                    Arkadaşlar yükleniyor...
                   </div>
                 ) : friends.length === 0 ? (
                   <p className="text-xs font-bold text-gray-400 text-center py-2">
-                    No friends available to invite.
+                    Davet edilebilecek arkadaş bulunamadı.
                   </p>
                 ) : (
                   <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
@@ -684,7 +1033,7 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <Avatar className="w-7 h-7 border border-black shrink-0">
-                              <AvatarImage src={friend.avatar_url || ""} />
+                              <AvatarImage src={getAvatarUrl(friend.avatar_url)} />
                               <AvatarFallback className="bg-purple-300 font-bold text-[10px]">
                                 {friend.username.charAt(0).toUpperCase()}
                               </AvatarFallback>
@@ -694,7 +1043,7 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
 
                           {isAlreadyMember ? (
                             <span className="text-[10px] font-black uppercase text-gray-400 bg-gray-200 px-2 py-0.5 border border-gray-400 rounded-sm">
-                              In Lobby
+                              Lobide
                             </span>
                           ) : (
                             <Button
@@ -704,7 +1053,7 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
                               className="h-7 px-2.5 bg-[#4ADE80] hover:bg-[#22c55e] text-black border border-black font-black text-[11px] shadow-[1px_1px_0_0_rgba(0,0,0,1)] cursor-pointer"
                             >
                               <UserPlus className="w-3 h-3 mr-1" />
-                              Invite
+                              Davet Et
                             </Button>
                           )}
                         </div>

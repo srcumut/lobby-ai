@@ -93,16 +93,16 @@ export function AllFriendsDialog({
     try {
       await friendsApi.acceptRequest(requestId);
       toast.add({
-        title: "Friend Request Accepted",
-        description: `You are now friends with ${username}!`,
+        title: "Arkadaşlık İsteği Kabul Edildi",
+        description: `Artık ${username} ile arkadaşsınız!`,
         type: "success",
       });
       await loadData();
       onFriendsUpdated();
     } catch (err: any) {
       toast.add({
-        title: "Error",
-        description: err.response?.data?.error?.message || "Failed to accept request",
+        title: "Hata",
+        description: err.response?.data?.error?.message || "İstek kabul edilemedi",
         type: "error",
       });
     } finally {
@@ -115,16 +115,16 @@ export function AllFriendsDialog({
     try {
       await friendsApi.rejectRequest(requestId);
       toast.add({
-        title: "Request Declined",
-        description: "Friend request was declined.",
+        title: "İstek Reddedildi",
+        description: "Arkadaşlık isteği reddedildi.",
         type: "info",
       });
       await loadData();
       onFriendsUpdated();
     } catch (err: any) {
       toast.add({
-        title: "Error",
-        description: err.response?.data?.error?.message || "Failed to decline request",
+        title: "Hata",
+        description: err.response?.data?.error?.message || "İstek reddedilemedi",
         type: "error",
       });
     } finally {
@@ -138,8 +138,8 @@ export function AllFriendsDialog({
     try {
       await friendsApi.removeFriend(friendToRemove.id);
       toast.add({
-        title: "Friend Removed",
-        description: `Removed ${friendToRemove.username} from your friends.`,
+        title: "Arkadaş Çıkarıldı",
+        description: `${friendToRemove.username} arkadaş listenizden çıkarıldı.`,
         type: "info",
       });
       setFriendToRemove(null);
@@ -147,8 +147,8 @@ export function AllFriendsDialog({
       onFriendsUpdated();
     } catch (err: any) {
       toast.add({
-        title: "Error",
-        description: err.response?.data?.error?.message || "Failed to remove friend",
+        title: "Hata",
+        description: err.response?.data?.error?.message || "Arkadaş çıkarılamadı",
         type: "error",
       });
     } finally {
@@ -169,24 +169,34 @@ export function AllFriendsDialog({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[550px] bg-white brutal-border border-4 brutal-shadow shadow-[8px_8px_0_0_rgba(0,0,0,1)] p-0 overflow-hidden flex flex-col max-h-[85vh]">
+        <DialogContent showCloseButton={false} className="sm:max-w-[550px] bg-white brutal-border border-4 brutal-shadow shadow-[8px_8px_0_0_rgba(0,0,0,1)] p-0 overflow-hidden flex flex-col max-h-[85vh]">
           {/* Header */}
           <DialogHeader className="p-4 border-b-4 border-black bg-[#E0F4FF] shrink-0">
-            <div className="flex items-center justify-between pr-6">
+            <div className="flex items-center justify-between gap-3">
               <DialogTitle className="text-2xl font-black uppercase flex items-center gap-2">
-                <Users className="w-6 h-6" /> Friends Hub
+                <Users className="w-6 h-6" /> Arkadaşlar
               </DialogTitle>
-              <Button
-                size="sm"
-                onClick={() => {
-                  onClose();
-                  onOpenAddFriend();
-                }}
-                className="bg-[#4ADE80] hover:bg-[#22c55e] text-black border-2 border-black font-black text-xs uppercase shadow-[2px_2px_0_0_rgba(0,0,0,1)] cursor-pointer"
-              >
-                <UserPlus className="w-3.5 h-3.5 mr-1" />
-                Add Friend
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    onClose();
+                    onOpenAddFriend();
+                  }}
+                  className="bg-[#4ADE80] hover:bg-[#22c55e] text-black border-2 border-black font-black text-xs uppercase shadow-[2px_2px_0_0_rgba(0,0,0,1)] cursor-pointer h-8 px-3 flex items-center"
+                >
+                  <UserPlus className="w-3.5 h-3.5 mr-1.5" />
+                  Arkadaş Ekle
+                </Button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-8 h-8 flex items-center justify-center bg-white border-2 border-black font-black hover:bg-[#F87171] hover:text-white transition-colors cursor-pointer shadow-[2px_2px_0_0_rgba(0,0,0,1)]"
+                  aria-label="Kapat"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </DialogHeader>
 
@@ -200,7 +210,7 @@ export function AllFriendsDialog({
                   : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              <span>All Friends</span>
+              <span>Tüm Arkadaşlar</span>
               <span className="bg-black text-white text-[10px] px-1.5 py-0.2 rounded-full">
                 {friends.length}
               </span>
@@ -213,7 +223,7 @@ export function AllFriendsDialog({
                   : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              <span>Requests</span>
+              <span>İstekler</span>
               {pendingRequests.length > 0 && (
                 <span className="bg-[#EF4444] text-white text-[10px] px-1.5 py-0.2 rounded-full animate-pulse">
                   {pendingRequests.length}
@@ -230,7 +240,8 @@ export function AllFriendsDialog({
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Filter friends by name or username..."
+                  placeholder="İsim veya kullanıcı adına göre filtrele..."
+                  autoComplete="off"
                   className="pl-9 bg-white border-2 border-black font-bold text-xs h-9 shadow-[2px_2px_0_0_rgba(0,0,0,1)] rounded-none"
                 />
               </div>
@@ -242,7 +253,7 @@ export function AllFriendsDialog({
             {isLoading ? (
               <div className="p-12 flex flex-col items-center justify-center gap-2 text-gray-500 font-bold">
                 <Loader2 className="w-8 h-8 animate-spin text-black" />
-                <span className="text-xs uppercase">Loading friends...</span>
+                <span className="text-xs uppercase">Arkadaşlar yükleniyor...</span>
               </div>
             ) : activeTab === "friends" ? (
               filteredFriends.length > 0 ? (
@@ -285,10 +296,10 @@ export function AllFriendsDialog({
                             router.push(`/messages?userId=${friend.id}`);
                             onClose();
                           }}
-                          className="h-8 px-2.5 bg-[#FEF08A] hover:bg-[#fde047] text-black border-2 border-black font-black text-xs uppercase shadow-[1px_1px_0_0_rgba(0,0,0,1)]"
+                          className="h-8 px-2.5 bg-[#FEF08A] hover:bg-[#fde047] text-black border-2 border-black font-black text-xs uppercase shadow-[1px_1px_0_0_rgba(0,0,0,1)] cursor-pointer"
                         >
                           <MessageSquare className="w-3.5 h-3.5 mr-1" />
-                          Chat
+                          Sohbet
                         </Button>
                         <Button
                           size="sm"
@@ -297,17 +308,17 @@ export function AllFriendsDialog({
                             setProfileUserId(friend.id);
                             setProfileOpen(true);
                           }}
-                          className="h-8 px-2.5 bg-white hover:bg-gray-100 text-black border-2 border-black font-black text-xs uppercase"
+                          className="h-8 px-2.5 bg-white hover:bg-gray-100 text-black border-2 border-black font-black text-xs uppercase cursor-pointer"
                         >
                           <User className="w-3.5 h-3.5 mr-1" />
-                          Profile
+                          Profil
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => setFriendToRemove(friend)}
-                          className="h-8 w-8 p-0 bg-[#FFE4E6] hover:bg-red-200 text-red-700 border-2 border-black"
-                          title="Remove Friend"
+                          className="h-8 w-8 p-0 bg-[#FFE4E6] hover:bg-red-200 text-red-700 border-2 border-black cursor-pointer"
+                          title="Arkadaşı Çıkar"
                         >
                           <UserMinus className="w-3.5 h-3.5" />
                         </Button>
@@ -321,12 +332,12 @@ export function AllFriendsDialog({
                     <Users className="w-6 h-6 text-gray-400" />
                   </div>
                   <p className="font-black text-sm uppercase">
-                    {searchQuery ? "No matching friends found" : "No friends added yet"}
+                    {searchQuery ? "Eşleşen arkadaş bulunamadı" : "Henüz arkadaş eklenmedi"}
                   </p>
                   <p className="text-xs font-bold text-gray-500 max-w-xs">
                     {searchQuery
-                      ? "Try searching for another keyword."
-                      : "Add friends using their username to see them here and chat together."}
+                      ? "Farklı bir arama terimi deneyin."
+                      : "Burada görmek ve sohbet etmek için kullanıcı adlarıyla arkadaş ekleyin."}
                   </p>
                 </div>
               )
@@ -350,7 +361,7 @@ export function AllFriendsDialog({
                         </p>
                         <span className="text-[10px] text-gray-500 font-bold flex items-center gap-1 mt-0.5">
                           <Clock className="w-3 h-3" />
-                          {new Date(req.created_at).toLocaleDateString()}
+                          {new Date(req.created_at).toLocaleDateString("tr-TR")}
                         </span>
                       </div>
                     </div>
@@ -367,7 +378,7 @@ export function AllFriendsDialog({
                         ) : (
                           <>
                             <Check className="w-3.5 h-3.5 mr-1" />
-                            Accept
+                            Kabul Et
                           </>
                         )}
                       </Button>
@@ -376,7 +387,7 @@ export function AllFriendsDialog({
                         variant="outline"
                         disabled={processingId === req.id}
                         onClick={() => handleRejectRequest(req.id)}
-                        className="bg-white hover:bg-gray-100 text-red-600 border-2 border-black font-black text-xs uppercase h-8 px-2.5"
+                        className="bg-white hover:bg-gray-100 text-red-600 border-2 border-black font-black text-xs uppercase h-8 px-2.5 cursor-pointer"
                       >
                         <X className="w-3.5 h-3.5" />
                       </Button>
@@ -389,9 +400,9 @@ export function AllFriendsDialog({
                 <div className="w-12 h-12 rounded-full bg-gray-100 border-2 border-black flex items-center justify-center">
                   <UserCheck className="w-6 h-6 text-gray-400" />
                 </div>
-                <p className="font-black text-sm uppercase">No Pending Requests</p>
+                <p className="font-black text-sm uppercase">Bekleyen İstek Yok</p>
                 <p className="text-xs font-bold text-gray-500">
-                  You don't have any incoming friend requests at the moment.
+                  Şu anda gelen herhangi bir arkadaşlık isteğiniz bulunmuyor.
                 </p>
               </div>
             )}
@@ -405,10 +416,10 @@ export function AllFriendsDialog({
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-black uppercase flex items-center gap-2">
               <UserMinus className="w-5 h-5 text-red-600" />
-              Remove Friend?
+              Arkadaş Çıkarılsın mı?
             </AlertDialogTitle>
             <AlertDialogDescription className="font-bold text-black/80 text-xs">
-              Are you sure you want to remove <span className="underline font-black">{friendToRemove?.username}</span> from your friends list?
+              <span className="underline font-black">{friendToRemove?.username}</span> adlı kullanıcıyı arkadaş listenizden çıkarmak istediğinizden emin misiniz?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 pt-2">
@@ -416,7 +427,7 @@ export function AllFriendsDialog({
               disabled={isRemoving}
               className="font-black uppercase bg-white border-2 border-black"
             >
-              Cancel
+              İptal
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
@@ -426,7 +437,7 @@ export function AllFriendsDialog({
               disabled={isRemoving}
               className="font-black uppercase bg-red-600 hover:bg-red-700 text-white border-2 border-black"
             >
-              {isRemoving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Yes, Remove"}
+              {isRemoving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Evet, Çıkar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

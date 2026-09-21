@@ -12,7 +12,7 @@ export const usersApi = {
     return response.data;
   },
   
-  updateProfile: async (data: { display_name?: string; bio?: string; avatar_url?: string }): Promise<UserInfo> => {
+  updateProfile: async (data: { display_name?: string; bio?: string; avatar_url?: string; banner_url?: string }): Promise<UserInfo> => {
     const response = await apiClient.patch<UserInfo>(`/users/me`, data);
     return response.data;
   },
@@ -24,12 +24,7 @@ export const usersApi = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await apiClient.post<UserInfo>('/users/me/avatar', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-
+    const response = await apiClient.post<UserInfo>('/users/me/avatar', formData);
     return response.data;
   },
 
@@ -38,6 +33,25 @@ export const usersApi = {
    */
   deleteAvatar: async (): Promise<UserInfo> => {
     const response = await apiClient.delete<UserInfo>('/users/me/avatar');
+    return response.data;
+  },
+
+  /**
+   * Directly uploads a cover banner image file for the current authenticated user.
+   */
+  uploadBanner: async (file: File): Promise<UserInfo> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await apiClient.post<UserInfo>('/users/me/banner', formData);
+    return response.data;
+  },
+
+  /**
+   * Clears/removes the current authenticated user's cover banner.
+   */
+  deleteBanner: async (): Promise<UserInfo> => {
+    const response = await apiClient.delete<UserInfo>('/users/me/banner');
     return response.data;
   },
 };

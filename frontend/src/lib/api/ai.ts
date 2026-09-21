@@ -49,11 +49,7 @@ export const aiApi = {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await apiClient.post<Agent>(`/ai/agents/${id}/avatar`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+    const response = await apiClient.post<Agent>(`/ai/agents/${id}/avatar`, formData);
 
     return response.data;
   },

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import { QueryProvider } from "@/components/providers/QueryProvider";
 import { AuthProvider } from "@/hooks/useAuth";
 import { AppShell } from "@/components/layout/AppShell";
 import { Toaster } from "@/components/ui/toast";
@@ -12,7 +13,7 @@ const spaceGrotesk = Space_Grotesk({
 
 export const metadata: Metadata = {
   title: "Lobby AI",
-  description: "Real-time lobby chat platform with AI agents",
+  description: "AI ajanları destekli gerçek zamanlı lobi ve sosyal sohbet platformu",
 };
 
 export default function RootLayout({
@@ -22,16 +23,18 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="tr"
       className={`${spaceGrotesk.variable} h-full antialiased`}
     >
       <body className="h-full flex flex-col font-sans overflow-hidden">
-        <AuthProvider>
-          <div className="flex h-screen w-full bg-white text-black overflow-hidden relative">
-            <AppShell>{children}</AppShell>
-          </div>
-          <Toaster />
-        </AuthProvider>
+        <QueryProvider>
+          <AuthProvider>
+            <div className="flex h-screen w-full bg-white text-black overflow-hidden relative">
+              <AppShell>{children}</AppShell>
+            </div>
+            <Toaster />
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );

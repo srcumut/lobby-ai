@@ -46,14 +46,21 @@ pub async fn register(
 }
 
 pub async fn login(state: &SharedState, request: LoginRequest) -> Result<AuthResponse, AppError> {
-    let user = user_repository::find_by_email(&state.db, &request.email)
-        .await?
-        .ok_or_else(|| AppError::Unauthorized("Invalid email or password".to_string()))?;
+    let identifier = request.email.trim();
+    let user = if identifier.contains('@') {
+        user_repository::find_by_email(&state.db, identifier).await?
+    } else {
+        match user_repository::find_by_username(&state.db, identifier).await? {
+            Some(u) => Some(u),
+            None => user_repository::find_by_email(&state.db, identifier).await?,
+        }
+    }
+    .ok_or_else(|| AppError::Unauthorized("Invalid email, username or password".to_string()))?;
 
     let valid = password::verify_password(&request.password, &user.password_hash)?;
     if !valid || user.is_bot {
         return Err(AppError::Unauthorized(
-            "Invalid email or password".to_string(),
+            "Invalid email, username or password".to_string(),
         ));
     }
 
@@ -101,9 +108,14 @@ fn build_auth_response(
             username: user.username.clone(),
             email: user.email.clone(),
             display_name: user.display_name.clone(),
+            first_name: user.first_name.clone(),
+            last_name: user.last_name.clone(),
             avatar_url: user.avatar_url.clone(),
+            banner_url: user.banner_url.clone(),
             bio: user.bio.clone(),
+            badges: user.badges.clone(),
             is_bot: user.is_bot,
+            coins: user.coins,
             created_at: user.created_at,
         },
     })

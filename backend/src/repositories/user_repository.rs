@@ -16,7 +16,7 @@ pub async fn create_user(
         r#"
         INSERT INTO users (username, email, password_hash, display_name)
         VALUES ($1, $2, $3, $4)
-        RETURNING id, username, email, password_hash, display_name, avatar_url, bio, is_bot, created_at, updated_at
+        RETURNING id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, is_bot, created_at, updated_at
         "#,
     )
     .bind(username)
@@ -31,7 +31,7 @@ pub async fn create_user(
 
 pub async fn find_by_email(pool: &PgPool, email: &str) -> Result<Option<User>, AppError> {
     let user = sqlx::query_as::<_, User>(
-        "SELECT id, username, email, password_hash, display_name, avatar_url, bio, is_bot, created_at, updated_at FROM users WHERE email = $1",
+        "SELECT id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, is_bot, created_at, updated_at FROM users WHERE email = $1",
     )
     .bind(email)
     .fetch_optional(pool)
@@ -42,7 +42,7 @@ pub async fn find_by_email(pool: &PgPool, email: &str) -> Result<Option<User>, A
 
 pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<User>, AppError> {
     let user = sqlx::query_as::<_, User>(
-        "SELECT id, username, email, password_hash, display_name, avatar_url, bio, is_bot, created_at, updated_at FROM users WHERE id = $1",
+        "SELECT id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, is_bot, created_at, updated_at FROM users WHERE id = $1",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -53,7 +53,7 @@ pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<User>, AppErro
 
 pub async fn find_by_username(pool: &PgPool, username: &str) -> Result<Option<User>, AppError> {
     let user = sqlx::query_as::<_, User>(
-        "SELECT id, username, email, password_hash, display_name, avatar_url, bio, is_bot, created_at, updated_at FROM users WHERE username = $1",
+        "SELECT id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, is_bot, created_at, updated_at FROM users WHERE username = $1",
     )
     .bind(username)
     .fetch_optional(pool)
@@ -65,23 +65,35 @@ pub async fn update_profile(
     pool: &PgPool,
     user_id: Uuid,
     display_name: Option<&str>,
+    first_name: Option<&str>,
+    last_name: Option<&str>,
     avatar_url: Option<&str>,
+    banner_url: Option<&str>,
     bio: Option<&str>,
+    badges: Option<&[String]>,
 ) -> Result<User, AppError> {
     let user = sqlx::query_as::<_, User>(
         r#"
         UPDATE users 
         SET display_name = COALESCE($1, display_name), 
-            avatar_url = COALESCE($2, avatar_url), 
-            bio = COALESCE($3, bio), 
+            first_name = COALESCE($2, first_name),
+            last_name = COALESCE($3, last_name),
+            avatar_url = COALESCE($4, avatar_url),
+            banner_url = COALESCE($5, banner_url),
+            bio = COALESCE($6, bio),
+            badges = COALESCE($7, badges),
             updated_at = now() 
-        WHERE id = $4
-        RETURNING id, username, email, password_hash, display_name, avatar_url, bio, is_bot, created_at, updated_at
+        WHERE id = $8
+        RETURNING id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, is_bot, created_at, updated_at
         "#,
     )
     .bind(display_name)
+    .bind(first_name)
+    .bind(last_name)
     .bind(avatar_url)
+    .bind(banner_url)
     .bind(bio)
+    .bind(badges)
     .bind(user_id)
     .fetch_one(pool)
     .await?;
@@ -99,10 +111,31 @@ pub async fn update_avatar(
         UPDATE users 
         SET avatar_url = $1, updated_at = now() 
         WHERE id = $2
-        RETURNING id, username, email, password_hash, display_name, avatar_url, bio, is_bot, created_at, updated_at
+        RETURNING id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, is_bot, created_at, updated_at
         "#,
     )
     .bind(avatar_url)
+    .bind(user_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(user)
+}
+
+pub async fn update_banner(
+    pool: &PgPool,
+    user_id: Uuid,
+    banner_url: Option<&str>,
+) -> Result<User, AppError> {
+    let user = sqlx::query_as::<_, User>(
+        r#"
+        UPDATE users 
+        SET banner_url = $1, updated_at = now() 
+        WHERE id = $2
+        RETURNING id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, is_bot, created_at, updated_at
+        "#,
+    )
+    .bind(banner_url)
     .bind(user_id)
     .fetch_one(pool)
     .await?;
@@ -170,9 +203,14 @@ pub async fn get_pending_incoming_requests(
             u.username,
             u.email,
             u.display_name,
+            u.first_name,
+            u.last_name,
             u.avatar_url,
+            u.banner_url,
             u.bio,
+            u.badges,
             u.is_bot,
+            u.coins,
             u.created_at as user_created_at
         FROM friend_requests fr
         JOIN users u ON fr.sender_id = u.id
@@ -193,9 +231,14 @@ pub async fn get_pending_incoming_requests(
             username: r.username,
             email: r.email,
             display_name: r.display_name,
+            first_name: r.first_name,
+            last_name: r.last_name,
             avatar_url: r.avatar_url,
+            banner_url: r.banner_url,
             bio: r.bio,
+            badges: r.badges,
             is_bot: r.is_bot,
+            coins: r.coins,
             created_at: r.user_created_at,
         }
     }).collect();
@@ -238,7 +281,7 @@ pub async fn get_friends(
     let records = sqlx::query!(
         r#"
         SELECT 
-            u.id, u.username, u.email, u.display_name, u.avatar_url, u.bio, u.is_bot, u.created_at
+            u.id, u.username, u.email, u.display_name, u.first_name, u.last_name, u.avatar_url, u.banner_url, u.bio, u.badges, u.coins, u.is_bot, u.created_at
         FROM friend_requests fr
         JOIN users u ON (u.id = fr.sender_id OR u.id = fr.receiver_id)
         WHERE (fr.sender_id = $1 OR fr.receiver_id = $1)
@@ -256,11 +299,90 @@ pub async fn get_friends(
         username: r.username,
         email: r.email,
         display_name: r.display_name,
+        first_name: r.first_name,
+        last_name: r.last_name,
         avatar_url: r.avatar_url,
+        banner_url: r.banner_url,
         bio: r.bio,
+        badges: r.badges,
+        coins: r.coins,
         is_bot: r.is_bot,
         created_at: r.created_at,
     }).collect();
 
     Ok(friends)
+}
+
+pub async fn unlock_badge(pool: &PgPool, user_id: Uuid, badge: &str) -> Result<User, AppError> {
+    let user = sqlx::query_as::<_, User>(
+        r#"
+        UPDATE users
+        SET badges = CASE 
+            WHEN $2 = ANY(badges) THEN badges 
+            ELSE array_append(badges, $2) 
+        END,
+        coins = CASE 
+            WHEN $2 = ANY(badges) THEN coins 
+            ELSE coins + 50 
+        END,
+        updated_at = NOW()
+        WHERE id = $1
+        RETURNING id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, coins, is_bot, created_at, updated_at
+        "#
+    )
+    .bind(user_id)
+    .bind(badge)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(user)
+}
+
+pub async fn add_coins(pool: &PgPool, user_id: Uuid, amount: i32) -> Result<i32, AppError> {
+    let new_coins = sqlx::query_scalar::<_, i32>(
+        "UPDATE users SET coins = GREATEST(0, coins + $2), updated_at = NOW() WHERE id = $1 RETURNING coins"
+    )
+    .bind(user_id)
+    .bind(amount)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(new_coins)
+}
+
+pub async fn purchase_shop_item(pool: &PgPool, user_id: Uuid, item_id: &str, item_type: &str, price: i32) -> Result<i32, AppError> {
+    let mut tx = pool.begin().await?;
+    let current_coins: i32 = sqlx::query_scalar("SELECT coins FROM users WHERE id = $1 FOR UPDATE")
+        .bind(user_id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+    if current_coins < price {
+        return Err(AppError::BadRequest("Yetersiz bakiye".to_string()));
+    }
+
+    let new_coins: i32 = sqlx::query_scalar("UPDATE users SET coins = coins - $2, updated_at = NOW() WHERE id = $1 RETURNING coins")
+        .bind(user_id)
+        .bind(price)
+        .fetch_one(&mut *tx)
+        .await?;
+
+    sqlx::query("INSERT INTO user_inventory (user_id, item_id, item_type, is_equipped) VALUES ($1, $2, $3, true) ON CONFLICT (user_id, item_id) DO NOTHING")
+        .bind(user_id)
+        .bind(item_id)
+        .bind(item_type)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+    Ok(new_coins)
+}
+
+pub async fn get_inventory(pool: &PgPool, user_id: Uuid) -> Result<Vec<String>, AppError> {
+    let items = sqlx::query_scalar::<_, String>("SELECT item_id FROM user_inventory WHERE user_id = $1")
+        .bind(user_id)
+        .fetch_all(pool)
+        .await?;
+
+    Ok(items)
 }

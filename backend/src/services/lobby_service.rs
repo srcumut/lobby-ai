@@ -231,6 +231,14 @@ pub async fn add_bot_to_lobby(
         return Err(AppError::Validation("User is not a bot".to_string()));
     }
 
+    // Check if bot is banned from this lobby
+    let is_banned = crate::repositories::moderation_repository::get_ban(&state.db, lobby_id, bot_user_id).await?.is_some();
+    if is_banned {
+        return Err(AppError::Forbidden(
+            "This bot is banned from this lobby and cannot be added until unbanned".to_string(),
+        ));
+    }
+
     // Check if already member
     let is_member = lobby_repository::is_member(&state.db, lobby_id, bot_user_id).await?;
     if is_member {
@@ -239,6 +247,21 @@ pub async fn add_bot_to_lobby(
 
     // Add bot to lobby as MEMBER
     lobby_repository::add_member(&state.db, lobby_id, bot_user_id, "MEMBER").await?;
+
+    // If agent is permitted to initiate conversation, trigger greeting
+    if let Ok(Some(agent)) = sqlx::query_as::<_, crate::models::ai::Agent>(
+        "SELECT * FROM agents WHERE user_id = $1"
+    )
+    .bind(bot_user_id)
+    .fetch_optional(&state.db)
+    .await {
+        if agent.can_initiate_conversation {
+            let state_clone = state.clone();
+            tokio::spawn(async move {
+                let _ = crate::services::ai_service::initiate_agent_chat(&state_clone, lobby_id, agent.id, caller_id).await;
+            });
+        }
+    }
 
     Ok(())
 }
@@ -309,6 +332,22 @@ pub async fn update_notification_preference(
 
     lobby_repository::update_notification_preference(&state.db, lobby_id, user_id, preference).await?;
     Ok(())
+}
+
+pub async fn get_notification_preference(
+    state: &SharedState,
+    lobby_id: Uuid,
+    user_id: Uuid,
+) -> Result<String, AppError> {
+    let is_member = lobby_repository::is_member(&state.db, lobby_id, user_id).await?;
+    if !is_member {
+        return Err(AppError::Forbidden("You are not a member of this lobby".to_string()));
+    }
+
+    let pref = lobby_repository::get_member_notification_preference(&state.db, lobby_id, user_id)
+        .await?
+        .unwrap_or_else(|| "MENTIONS_ONLY".to_string());
+    Ok(pref)
 }
 
 pub async fn invite_user(

@@ -47,6 +47,7 @@ pub async fn send_direct_message(
         content: dm.content,
         is_read: dm.is_read,
         created_at: dm.created_at,
+        reactions: std::collections::HashMap::new(),
     };
 
     // Broadcast real-time direct message event via GlobalWsManager to receiver & sender
@@ -113,19 +114,73 @@ pub async fn get_conversation(
     // Mark messages from friend to current_user as read
     let _ = direct_message_repository::mark_as_read(&state.db, current_user_id, friend_id).await;
 
+    let msg_ids: Vec<Uuid> = messages.iter().map(|m| m.id).collect();
+    let mut reactions_map = direct_message_repository::get_reactions_for_messages(&state.db, &msg_ids)
+        .await
+        .unwrap_or_default();
+
     let response = messages
         .into_iter()
-        .map(|m| DirectMessageResponse {
-            id: m.id,
-            sender_id: m.sender_id,
-            receiver_id: m.receiver_id,
-            content: m.content,
-            is_read: m.is_read,
-            created_at: m.created_at,
+        .map(|m| {
+            let rx = reactions_map.remove(&m.id).unwrap_or_default();
+            DirectMessageResponse {
+                id: m.id,
+                sender_id: m.sender_id,
+                receiver_id: m.receiver_id,
+                content: m.content,
+                is_read: m.is_read,
+                created_at: m.created_at,
+                reactions: rx,
+            }
         })
         .collect();
 
     Ok(response)
+}
+
+pub async fn toggle_reaction(
+    state: &SharedState,
+    current_user_id: Uuid,
+    message_id: Uuid,
+    emoji: &str,
+) -> Result<std::collections::HashMap<String, Vec<Uuid>>, AppError> {
+    let dm = direct_message_repository::get_direct_message_by_id(&state.db, message_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Direct message not found".to_string()))?;
+
+    // Must be either sender or receiver
+    if dm.sender_id != current_user_id && dm.receiver_id != current_user_id {
+        return Err(AppError::Forbidden("You do not have permission to react to this message.".to_string()));
+    }
+
+    direct_message_repository::toggle_reaction(&state.db, message_id, current_user_id, emoji).await?;
+
+    let reactions = direct_message_repository::get_reactions_for_messages(&state.db, &[message_id])
+        .await?
+        .remove(&message_id)
+        .unwrap_or_default();
+
+    let partner_id = if dm.sender_id == current_user_id {
+        dm.receiver_id
+    } else {
+        dm.sender_id
+    };
+
+    let payload = serde_json::json!({
+        "message_id": message_id,
+        "reactions": reactions,
+        "user_id": current_user_id,
+        "emoji": emoji,
+    });
+
+    let event = WsOutgoingEvent {
+        event_type: "direct_message.reaction_updated".to_string(),
+        payload,
+    };
+    state.global_ws_manager.send_to_user(partner_id, event.clone()).await;
+    state.global_ws_manager.send_to_user(current_user_id, event).await;
+
+    Ok(reactions)
 }
 
 pub async fn get_conversations(

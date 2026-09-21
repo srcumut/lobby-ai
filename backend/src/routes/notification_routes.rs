@@ -13,6 +13,10 @@ pub fn routes() -> Router<SharedState> {
             get(notification_handler::get_notifications),
         )
         .route(
+            "/api/notifications/all",
+            get(notification_handler::get_all_notifications),
+        )
+        .route(
             "/api/notifications/read-all",
             patch(notification_handler::mark_all_as_read),
         )

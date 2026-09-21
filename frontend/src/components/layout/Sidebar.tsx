@@ -18,8 +18,12 @@ import {
   PanelLeftClose, 
   Users, 
   Plus,
-  MessageSquare 
+  MessageSquare,
+  MessageSquarePlus,
+  Sparkles,
+  ShoppingBag
 } from "lucide-react";
+import { FeedbackModal } from "@/components/feedback/FeedbackModal";
 import { Button } from "@/components/ui/button";
 import { getAvatarUrl } from "@/lib/avatar";
 import {
@@ -48,6 +52,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const [pendingCount, setPendingCount] = useState(0);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAllFriendsOpen, setIsAllFriendsOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
 
   const fetchFriendsData = async () => {
     if (!isAuthenticated) return;
@@ -77,10 +82,12 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   }, [isAuthenticated]);
 
   const navItems = [
-    { name: "Dashboard", href: "/", icon: Home },
-    { name: "Discover Rooms", href: "/lobbies", icon: Compass },
-    { name: "Messages", href: "/messages", icon: MessageSquare },
-    { name: "My Agents", href: "/agents", icon: Bot },
+    { name: "Kontrol Paneli", href: "/", icon: Home },
+    { name: "Odaları Keşfet", href: "/lobbies", icon: Compass },
+    { name: "Mesajlar", href: "/messages", icon: MessageSquare },
+    { name: "Topluluk Meydanı", href: "/community", icon: Sparkles },
+    { name: "Mağaza", href: "/shop", icon: ShoppingBag },
+    { name: "Ajanlarım", href: "/agents", icon: Bot },
   ];
 
   return (
@@ -93,38 +100,29 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         />
       )}
 
-      {/* Sidebar Container */}
+      {/* Sidebar Container: Starts below full-width Navbar, width 260px, border-r-2 border-black */}
       <aside 
         className={`
-          fixed md:sticky top-0 left-0 z-50 h-screen w-64 flex flex-col
-          bg-[#F4F4F5] border-r border-black/[0.08] transition-transform duration-300 ease-in-out
+          fixed md:relative top-16 md:top-0 left-0 z-40 h-[calc(100vh-4rem)] md:h-full w-[260px] flex flex-col
+          bg-[#F4F0E6] border-r-2 border-black transition-transform duration-300 ease-in-out shrink-0 select-none
           ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
         `}
       >
-        {/* Logo Area */}
-        <div className="h-16 border-b border-black/[0.08] flex items-center justify-center px-4 bg-[#A78BFA] shrink-0 relative">
-          <Link href="/" className="flex items-center group cursor-pointer" onClick={() => setIsOpen(false)}>
-            <div className="flex -space-x-1">
-              <div className="bg-[#4ADE80] border-2 border-black px-2.5 py-0.5 transform -rotate-6 group-hover:rotate-0 transition-all shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
-                <span className="font-black text-lg tracking-tighter uppercase text-black">LOBBY</span>
-              </div>
-              <div className="bg-[#FEF08A] border-2 border-black px-2.5 py-0.5 transform rotate-6 group-hover:rotate-0 transition-all shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
-                <span className="font-black text-lg tracking-tighter uppercase text-black">AI</span>
-              </div>
-            </div>
-          </Link>
+        {/* Mobile Header (Only visible on mobile screens) */}
+        <div className="flex md:hidden items-center justify-between px-4 py-2 border-b-2 border-black bg-[#FDFBF7]">
+          <span className="font-black text-xs uppercase tracking-wider text-gray-600">Menü</span>
           <Button 
             variant="ghost" 
             size="icon" 
-            className="md:hidden text-black hover:bg-black/10 absolute right-3"
+            className="text-black hover:bg-black/10 h-7 w-7 p-0"
             onClick={() => setIsOpen(false)}
           >
-            <PanelLeftClose className="w-5 h-5" />
+            <PanelLeftClose className="w-4 h-4" />
           </Button>
         </div>
 
-        {/* Navigation */}
-        <div className="flex-1 overflow-y-auto py-6 px-4 flex flex-col gap-2">
+        {/* Navigation Area */}
+        <div className="flex-1 overflow-y-auto p-3.5 flex flex-col gap-1.5 no-scrollbar">
           {isAuthenticated ? (
             <>
               {navItems.map((item) => {
@@ -136,68 +134,68 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                     href={item.href}
                     onClick={() => setIsOpen(false)}
                     className={`
-                      flex items-center gap-3 px-3 py-2.5 rounded-sm font-bold text-sm uppercase transition-all
-                      border-2 brutal-border
+                      flex items-center gap-2.5 px-3 py-2 rounded-sm font-black text-xs uppercase transition-all
+                      border-2 border-black cursor-pointer
                       ${isActive 
-                        ? 'bg-black text-white shadow-[2px_2px_0_0_rgba(255,255,255,1)] translate-x-1 translate-y-1' 
-                        : 'bg-white text-black hover:bg-[#FEF08A] hover:shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:-translate-y-0.5'}
+                        ? 'bg-black text-white shadow-[2px_2px_0_0_rgba(255,255,255,1)] translate-x-0.5 translate-y-0.5' 
+                        : 'bg-white text-black hover:bg-[#FEF08A] hover:shadow-[3px_3px_0_0_rgba(0,0,0,1)] hover:-translate-y-0.5'}
                     `}
                   >
-                    <Icon className="w-5 h-5" />
-                    <span className="flex-1">{item.name}</span>
+                    <Icon className="w-4 h-4 shrink-0 stroke-[2.5]" />
+                    <span className="flex-1 tracking-wide">{item.name}</span>
                     {isActive && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#4ADE80] animate-pulse"></span>
+                      <span className="w-2 h-2 rounded-full bg-[#FB923C] animate-pulse shrink-0"></span>
                     )}
                   </Link>
                 );
               })}
 
-              {/* Friends Section */}
-              <div className="mt-4 pt-4 border-t-2 border-dashed border-gray-300">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-black text-xs uppercase tracking-wider text-gray-500 flex items-center gap-1">
-                    <Users className="w-4 h-4" /> Friends
+              {/* Friends Section: Compact, no scrollbar overflow, 3 friends fit comfortably */}
+              <div className="mt-3 pt-3 border-t-2 border-dashed border-gray-300">
+                <div className="flex items-center justify-between mb-2 px-0.5">
+                  <h3 className="font-black text-[11px] uppercase tracking-wider text-gray-700 flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-black" /> Arkadaşlar
                     {pendingCount > 0 && (
-                      <span className="bg-[#EF4444] text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1 font-bold animate-pulse">
+                      <span className="bg-[#F472B6] text-black text-[10px] px-1.5 py-0.2 rounded-full font-black border border-black animate-pulse">
                         {pendingCount}
                       </span>
                     )}
                   </h3>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1">
                     <button 
                       onClick={() => setIsAllFriendsOpen(true)}
-                      className="p-1 bg-[#FEF08A] hover:bg-[#fde047] border-2 border-black rounded-sm shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:-translate-y-[1px] hover:shadow-[3px_3px_0_0_rgba(0,0,0,1)] transition-all cursor-pointer"
-                      title="All Friends & Requests"
+                      className="p-1 bg-[#FEF08A] hover:bg-[#fde047] border-2 border-black rounded-sm shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:-translate-y-px transition-all cursor-pointer"
+                      title="Tüm Arkadaşlar ve İstekler"
                     >
                       <Users className="w-3 h-3 text-black" />
                     </button>
                     <button 
                       onClick={() => setIsAddModalOpen(true)}
-                      className="p-1 bg-[#4ADE80] hover:bg-[#22c55e] border-2 border-black rounded-sm shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:-translate-y-[1px] hover:shadow-[3px_3px_0_0_rgba(0,0,0,1)] transition-all cursor-pointer"
-                      title="Add Friend"
+                      className="p-1 bg-[#FB923C] hover:bg-[#F97316] border-2 border-black rounded-sm shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:-translate-y-px transition-all cursor-pointer"
+                      title="Arkadaş Ekle"
                     >
-                      <Plus className="w-3 h-3 text-black" />
+                      <Plus className="w-3 h-3 text-black stroke-[3]" />
                     </button>
                   </div>
                 </div>
 
                 {friends.length === 0 ? (
-                  <div className="text-xs font-bold text-gray-400 p-2 text-center bg-gray-100 rounded-sm">
-                    No friends yet
+                  <div className="text-[11px] font-bold text-gray-500 p-2.5 text-center bg-white border-2 border-dashed border-gray-300 rounded-sm">
+                    Henüz arkadaş yok
                   </div>
                 ) : (
-                  <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
-                    {friends.slice(0, 6).map(friend => (
+                  <div className="space-y-1 overflow-hidden">
+                    {friends.slice(0, 3).map(friend => (
                       <div 
                         key={friend.id} 
                         onClick={() => {
                           router.push(`/messages?userId=${friend.id}`);
                           setIsOpen(false);
                         }}
-                        className="flex items-center gap-2 p-1.5 bg-white border-2 border-transparent hover:border-black rounded-sm cursor-pointer group hover:shadow-[2px_2px_0_0_rgba(0,0,0,1)] transition-all"
-                        title={`Message ${friend.username}`}
+                        className="flex items-center gap-2 py-1.5 px-2 bg-white border-2 border-transparent hover:border-black rounded-sm cursor-pointer group hover:shadow-[2px_2px_0_0_rgba(0,0,0,1)] transition-all"
+                        title={`Mesaj Gönder: ${friend.username}`}
                       >
-                        <div className="w-6 h-6 bg-[#A78BFA] rounded-full border border-black flex items-center justify-center font-black text-[10px] text-white shrink-0 overflow-hidden">
+                        <div className="w-6 h-6 bg-gradient-to-br from-[#FB923C] to-[#F472B6] rounded-full border border-black flex items-center justify-center font-black text-[10px] text-white shrink-0 overflow-hidden">
                           {friend.avatar_url ? (
                             <img
                               src={getAvatarUrl(friend.avatar_url)}
@@ -208,45 +206,56 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                             friend.username.charAt(0).toUpperCase()
                           )}
                         </div>
-                        <span className="font-bold text-sm truncate flex-1">{friend.username}</span>
-                        <MessageSquare className="w-3.5 h-3.5 text-gray-400 group-hover:text-black shrink-0 transition-colors" />
+                        <span className="font-bold text-xs truncate flex-1 text-black">{friend.username}</span>
+                        <MessageSquare className="w-3 h-3 text-gray-400 group-hover:text-black shrink-0 transition-colors" />
                       </div>
                     ))}
 
                     <button
                       onClick={() => setIsAllFriendsOpen(true)}
-                      className="w-full mt-2 py-1 text-[11px] font-black uppercase text-center bg-gray-50 hover:bg-[#FEF08A] border-2 border-dashed border-gray-400 hover:border-black rounded-sm transition-all cursor-pointer text-gray-700 hover:text-black shadow-[1px_1px_0_0_rgba(0,0,0,1)]"
+                      className="w-full mt-2 py-1.5 text-[11px] font-black uppercase text-center bg-white hover:bg-[#FEF08A] border-2 border-black rounded-sm transition-all cursor-pointer text-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:shadow-[3px_3px_0_0_rgba(0,0,0,1)] hover:-translate-y-px block"
                     >
-                      View All Friends ({friends.length})
+                      TÜM ARKADAŞLARI GÖR ({friends.length})
                     </button>
                   </div>
                 )}
               </div>
             </>
           ) : (
-            <div className="text-center mt-10">
-              <p className="font-bold text-gray-500 mb-4">Please log in to access the platform.</p>
+            <div className="text-center mt-6 p-3 bg-white border-2 border-black shadow-[3px_3px_0_0_rgba(0,0,0,1)] rounded-sm">
+              <p className="font-bold text-xs text-gray-600 mb-3">Odalara katılmak ve sohbet etmek için giriş yapın.</p>
               <Link href="/login" onClick={() => setIsOpen(false)}>
-                <Button className="w-full bg-[#4ADE80] text-black border-2 border-black font-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:-translate-y-1 hover:shadow-[4px_4px_0_0_rgba(0,0,0,1)] transition-all">
-                  LOG IN
+                <Button className="w-full bg-[#FB923C] hover:bg-[#F97316] text-black border-2 border-black font-black text-xs shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:-translate-y-0.5 hover:shadow-[3px_3px_0_0_rgba(0,0,0,1)] transition-all">
+                  GİRİŞ YAP
                 </Button>
               </Link>
             </div>
           )}
+          {/* Feedback Button */}
+          <div className="mt-3 pt-3 border-t-2 border-dashed border-black/20">
+            <button
+              onClick={() => setIsFeedbackOpen(true)}
+              className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-[#FEF08A] hover:bg-[#FDE047] border-2 border-black rounded-sm font-black text-xs uppercase tracking-wider text-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:shadow-[3px_3px_0_0_rgba(0,0,0,1)] hover:-translate-y-px transition-all cursor-pointer"
+              title="Öneri ve Hata Bildir"
+            >
+              <MessageSquarePlus className="w-4 h-4 text-black stroke-[2.5]" />
+              Geri Bildirim Bildir
+            </button>
+          </div>
         </div>
 
         {/* User Profile (Bottom) */}
         {isAuthenticated && user && (
-          <div className="border-t border-black/[0.08] p-4 bg-white shrink-0">
+          <div className="border-t-2 border-black p-3 bg-[#FDFBF7] shrink-0">
             <div 
               onClick={() => {
                 router.push("/profile");
                 setIsOpen(false);
               }}
-              className="flex items-center gap-3 mb-4 cursor-pointer hover:bg-gray-50 p-1.5 rounded-sm border-2 border-transparent hover:border-black hover:shadow-[2px_2px_0_0_rgba(0,0,0,1)] transition-all group"
-              title="Go to My Profile"
+              className="flex items-center gap-2.5 mb-3 cursor-pointer hover:bg-gray-50 p-1.5 rounded-sm border-2 border-transparent hover:border-black hover:shadow-[2px_2px_0_0_rgba(0,0,0,1)] transition-all group"
+              title="Profilime Git"
             >
-              <div className="w-10 h-10 rounded-full border-2 border-black bg-[#F472B6] flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)] shrink-0 group-hover:scale-105 transition-transform overflow-hidden">
+              <div className="w-9 h-9 rounded-full border-2 border-black bg-[#F472B6] flex items-center justify-center shadow-[2px_2px_0_0_rgba(0,0,0,1)] shrink-0 group-hover:scale-105 transition-transform overflow-hidden">
                 {user.avatar_url ? (
                   <img
                     src={getAvatarUrl(user.avatar_url)}
@@ -254,12 +263,12 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <User className="w-5 h-5 text-black" />
+                  <User className="w-4 h-4 text-black" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-black text-sm truncate group-hover:underline">{user.display_name || user.username}</p>
-                <p className="text-xs font-bold text-gray-500 truncate">@{user.username}</p>
+                <p className="font-black text-xs truncate group-hover:underline text-black">{user.display_name || user.username}</p>
+                <p className="text-[10px] font-bold text-gray-500 truncate">@{user.username}</p>
               </div>
             </div>
             
@@ -267,14 +276,14 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               <Button 
                 variant="outline" 
                 size="sm"
-                className="flex-1 bg-[#E0F4FF] text-black border-2 border-black font-bold shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:shadow-[3px_3px_0_0_rgba(0,0,0,1)] hover:-translate-y-px transition-all cursor-pointer"
+                className="flex-1 h-8 bg-[#FEF08A] hover:bg-[#FDE047] text-black border-2 border-black font-black text-xs shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:shadow-[3px_3px_0_0_rgba(0,0,0,1)] hover:-translate-y-px transition-all cursor-pointer"
                 onClick={() => {
                   router.push("/profile");
                   setIsOpen(false);
                 }}
               >
-                <Settings className="w-4 h-4 mr-1" />
-                Profile
+                <Settings className="w-3.5 h-3.5 mr-1" />
+                PROFİL
               </Button>
               
               <AlertDialog>
@@ -283,28 +292,29 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
                     <Button 
                       variant="outline" 
                       size="icon"
-                      className="bg-[#FFE4E6] text-black border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:shadow-[3px_3px_0_0_rgba(0,0,0,1)] hover:-translate-y-px transition-all cursor-pointer"
+                      className="h-8 w-8 bg-[#FFE4E6] hover:bg-[#fecdd3] text-black border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:shadow-[3px_3px_0_0_rgba(0,0,0,1)] hover:-translate-y-px transition-all cursor-pointer"
+                      title="Çıkış Yap"
                     >
-                      <LogOut className="w-4 h-4 text-red-600" />
+                      <LogOut className="w-3.5 h-3.5 text-red-600" />
                     </Button>
                   }
                 />
-                <AlertDialogContent className="brutal-border brutal-shadow bg-[#FEF08A]">
+                <AlertDialogContent className="border-2 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] bg-[#FEF08A] rounded-sm">
                   <AlertDialogHeader>
-                    <AlertDialogTitle className="text-2xl font-black uppercase">Leaving so soon?</AlertDialogTitle>
-                    <AlertDialogDescription className="font-bold text-black/80">
-                      Are you sure you want to log out?
+                    <AlertDialogTitle className="text-2xl font-black uppercase">Ayrılıyor musunuz?</AlertDialogTitle>
+                    <AlertDialogDescription className="font-bold text-black/80 text-sm">
+                      Lobby AI hesabınızdan çıkış yapmak istediğinize emin misiniz?
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter className="mt-4">
-                    <AlertDialogCancel className="font-black bg-white text-black border-2 border-black uppercase cursor-pointer">
-                      Cancel
+                    <AlertDialogCancel className="font-black bg-white text-black border-2 border-black uppercase text-xs cursor-pointer shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                      İptal
                     </AlertDialogCancel>
                     <AlertDialogAction 
                       onClick={logout}
-                      className="font-black bg-red-600 text-white border-2 border-black uppercase hover:bg-red-700 cursor-pointer"
+                      className="font-black bg-red-600 text-white border-2 border-black uppercase text-xs hover:bg-red-700 cursor-pointer shadow-[2px_2px_0_0_rgba(0,0,0,1)]"
                     >
-                      Log Out
+                      Çıkış Yap
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -327,6 +337,12 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         onClose={() => setIsAllFriendsOpen(false)}
         onFriendsUpdated={fetchFriendsData}
         onOpenAddFriend={() => setIsAddModalOpen(true)}
+      />
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
       />
     </>
   );

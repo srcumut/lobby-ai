@@ -71,7 +71,7 @@ export const lobbiesApi = {
     return response.data;
   },
 
-  moderateUser: async (lobbyId: string, action: 'kick' | 'mute' | 'unmute' | 'ban' | 'unban', userId: string, durationMinutes?: number): Promise<void> => {
+  moderateUser: async (lobbyId: string, action: 'kick' | 'mute' | 'unmute' | 'ban' | 'unban', userId: string, durationMinutes?: number | null): Promise<void> => {
     if (action === 'unmute') {
       await apiClient.delete(`/lobbies/${lobbyId}/moderation/mute/${userId}`);
       return;
@@ -80,7 +80,7 @@ export const lobbiesApi = {
       await apiClient.delete(`/lobbies/${lobbyId}/moderation/ban/${userId}`);
       return;
     }
-    const data = action === 'mute' ? { duration_minutes: durationMinutes || 60 } : undefined;
+    const data = action === 'mute' ? { duration_minutes: durationMinutes === null ? null : (durationMinutes ?? 60) } : undefined;
     await apiClient.post(`/lobbies/${lobbyId}/moderation/${action}/${userId}`, data);
   },
 
@@ -127,5 +127,10 @@ export const lobbiesApi = {
 
   inviteUser: async (lobbyId: string, payload: { username?: string; user_id?: string }): Promise<void> => {
     await apiClient.post(`/lobbies/${lobbyId}/invites`, payload);
+  },
+
+  sendMessage: async (id: string, content: string): Promise<MessageResponse> => {
+    const response = await apiClient.post<MessageResponse>(`/lobbies/${id}/messages`, { content });
+    return response.data;
   },
 };

@@ -17,7 +17,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (isLoading || !isAuthenticated) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-xl font-bold animate-pulse">Loading...</div>
+        <div className="text-xl font-bold animate-pulse">Yükleniyor...</div>
       </div>
     );
   }
