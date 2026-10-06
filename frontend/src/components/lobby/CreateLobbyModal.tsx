@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Lock, Globe, Plus, Loader2 } from "lucide-react";
+import { trackQuestAction } from "@/data/dailyQuests";
 
 interface CreateLobbyModalProps {
   isOpen: boolean;
@@ -44,6 +45,7 @@ export function CreateLobbyModal({ isOpen, onClose }: CreateLobbyModalProps) {
       };
 
       const created = await lobbiesApi.createLobby(request);
+      trackQuestAction("lobby_created");
       setName("");
       setDescription("");
       setIsPrivate(false);

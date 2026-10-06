@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { BarChart3, Plus, Trash2, CheckCircle2, Trophy, Clock, X } from "lucide-react";
-import { playPointSound, playBlipSound, playWinSound } from "@/lib/arcadeSounds";
 
 export interface PollState {
   id: string;
@@ -83,7 +82,6 @@ export function LobbyPollDialog({
     };
 
     setActivePoll(newPoll);
-    playBlipSound();
 
     // Broadcast poll created
     sendGameAction({
@@ -98,7 +96,6 @@ export function LobbyPollDialog({
 
   const handleVote = (optionIndex: number) => {
     if (!activePoll || activePoll.isClosed) return;
-    playPointSound();
 
     const updatedVotes = {
       ...activePoll.votes,
@@ -122,7 +119,6 @@ export function LobbyPollDialog({
 
   const handleClosePoll = () => {
     if (!activePoll) return;
-    playWinSound();
 
     const closedPoll = {
       ...activePoll,

@@ -32,3 +32,6 @@ postgres_data/
 *.dll
 *.so
 *.dylib
+
+# Uploaded media
+backend/uploads/

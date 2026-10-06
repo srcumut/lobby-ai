@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BarChart2, Clock, CheckCircle2, Crown, CheckSquare, Square, XCircle } from "lucide-react";
 import { getAvatarUrl } from "@/lib/avatar";
-import { playPointSound, playBlipSound } from "@/lib/arcadeSounds";
 
 interface LobbyPollCardProps {
   poll: Poll;
@@ -37,7 +36,6 @@ export function LobbyPollCard({
   const handleVoteClick = async (optionId: string) => {
     if (poll.is_closed || isVoting) return;
     setIsVoting(true);
-    playBlipSound();
     try {
       await onVote(poll.id, optionId);
     } finally {

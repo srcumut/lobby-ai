@@ -11,12 +11,16 @@ pub async fn create_lobby(
     owner_id: Uuid,
     visibility: &str,
     password_hash: Option<&str>,
+    theme: Option<&str>,
+    icon: Option<&str>,
 ) -> Result<Lobby, AppError> {
+    let theme_val = theme.unwrap_or("cyber-cyan");
+    let icon_val = icon.unwrap_or("💬");
     let lobby = sqlx::query_as::<_, Lobby>(
         r#"
-        INSERT INTO lobbies (name, description, owner_id, visibility, password_hash)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, name, description, owner_id, visibility, password_hash, created_at, updated_at
+        INSERT INTO lobbies (name, description, owner_id, visibility, password_hash, theme, icon)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id, name, description, owner_id, visibility, password_hash, theme, icon, announcement, xp, created_at, updated_at
         "#,
     )
     .bind(name)
@@ -24,6 +28,8 @@ pub async fn create_lobby(
     .bind(owner_id)
     .bind(visibility)
     .bind(password_hash)
+    .bind(theme_val)
+    .bind(icon_val)
     .fetch_one(pool)
     .await?;
 
@@ -32,7 +38,7 @@ pub async fn create_lobby(
 
 pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Lobby>, AppError> {
     let lobby = sqlx::query_as::<_, Lobby>(
-        "SELECT id, name, description, owner_id, visibility, password_hash, created_at, updated_at FROM lobbies WHERE id = $1",
+        "SELECT id, name, description, owner_id, visibility, password_hash, theme, icon, announcement, xp, created_at, updated_at FROM lobbies WHERE id = $1",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -43,7 +49,7 @@ pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Lobby>, AppErr
 
 pub async fn list_public_lobbies(pool: &PgPool) -> Result<Vec<Lobby>, AppError> {
     let lobbies = sqlx::query_as::<_, Lobby>(
-        "SELECT id, name, description, owner_id, visibility, password_hash, created_at, updated_at FROM lobbies ORDER BY created_at DESC",
+        "SELECT id, name, description, owner_id, visibility, password_hash, theme, icon, announcement, xp, created_at, updated_at FROM lobbies ORDER BY created_at DESC",
     )
     .fetch_all(pool)
     .await?;
@@ -66,6 +72,19 @@ pub async fn add_member(
     user_id: Uuid,
     role: &str,
 ) -> Result<LobbyMember, AppError> {
+    let mut tx = pool.begin().await?;
+    let xp: i64 = sqlx::query_scalar("SELECT xp FROM lobbies WHERE id = $1 FOR UPDATE")
+        .bind(lobby_id)
+        .fetch_one(&mut *tx)
+        .await?;
+    let capacity = if xp >= 1500 { 100 } else if xp >= 700 { 60 } else if xp >= 300 { 40 } else if xp >= 100 { 30 } else { 20 };
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM lobby_members WHERE lobby_id = $1")
+        .bind(lobby_id)
+        .fetch_one(&mut *tx)
+        .await?;
+    if count >= capacity {
+        return Err(AppError::Conflict("Lobi kapasitesi dolu. Seviye atlayınca yeni yerler açılır.".to_string()));
+    }
     let member = sqlx::query_as::<_, LobbyMember>(
         r#"
         INSERT INTO lobby_members (lobby_id, user_id, role)
@@ -76,8 +95,14 @@ pub async fn add_member(
     .bind(lobby_id)
     .bind(user_id)
     .bind(role)
-    .fetch_one(pool)
+    .fetch_one(&mut *tx)
     .await?;
+
+    sqlx::query("UPDATE lobbies SET xp = xp + 5 WHERE id = $1")
+        .bind(lobby_id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
 
     Ok(member)
 }
@@ -215,6 +240,9 @@ pub async fn update_lobby(
     lobby_id: Uuid,
     name: Option<&str>,
     description: Option<&str>,
+    theme: Option<&str>,
+    icon: Option<&str>,
+    announcement: Option<&str>,
 ) -> Result<Lobby, AppError> {
     let lobby = sqlx::query_as::<_, Lobby>(
         r#"
@@ -222,13 +250,19 @@ pub async fn update_lobby(
         SET 
             name = COALESCE($1, name),
             description = COALESCE($2, description),
+            theme = COALESCE($3, theme),
+            icon = COALESCE($4, icon),
+            announcement = COALESCE($5, announcement),
             updated_at = NOW()
-        WHERE id = $3
-        RETURNING id, name, description, owner_id, visibility, password_hash, created_at, updated_at
+        WHERE id = $6
+        RETURNING id, name, description, owner_id, visibility, password_hash, theme, icon, announcement, xp, created_at, updated_at
         "#,
     )
     .bind(name)
     .bind(description)
+    .bind(theme)
+    .bind(icon)
+    .bind(announcement)
     .bind(lobby_id)
     .fetch_one(pool)
     .await?;

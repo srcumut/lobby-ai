@@ -20,9 +20,12 @@ import {
   ArrowUpDown, 
   Plus, 
   Flame,
-  Radio
+  Radio,
+  SearchX,
+  DoorOpen
 } from "lucide-react";
 import { FullPagination } from "@/components/ui/pagination";
+import { getLobbyTheme } from "@/lib/lobbyThemes";
 
 const ITEMS_PER_PAGE = 6;
 
@@ -312,23 +315,48 @@ export default function LobbiesPage() {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredLobbies.length === 0 ? (
-                <div className="col-span-full text-center py-16 bg-white brutal-border border-3 shadow-[4px_4px_0_0_rgba(0,0,0,1)] rounded-sm space-y-4">
-                  <p className="text-2xl font-black text-black uppercase">Aramanızla Eşleşen Lobi Bulunamadı</p>
-                  <p className="text-sm font-bold text-gray-500">Filtrelerinizi değiştirmeyi deneyin ya da yeni bir lobi oluşturun!</p>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => { setSearchQuery(""); setFilterVisibility("ALL"); }}
-                    className="brutal-border font-black text-xs uppercase"
-                  >
-                    Filtreleri Temizle
-                  </Button>
+                <div className="col-span-full text-center py-16 px-6 bg-white brutal-border border-3 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] rounded-sm space-y-4">
+                  <div className="w-16 h-16 bg-[#FEF08A] rounded-full border-3 border-black mx-auto flex items-center justify-center shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
+                    {lobbies.length === 0 ? (
+                      <DoorOpen className="w-8 h-8 text-black" />
+                    ) : (
+                      <SearchX className="w-8 h-8 text-black" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black text-black uppercase">
+                      {lobbies.length === 0 ? "Henüz Aktif Bir Lobi Yok" : "Aramanızla Eşleşen Lobi Bulunamadı"}
+                    </h3>
+                    <p className="text-sm font-bold text-gray-600 mt-1 max-w-md mx-auto">
+                      {lobbies.length === 0
+                        ? "İlk odayı sen oluştur ve topluluğu sohbet için bir araya getir!"
+                        : "Arama terimini değiştirmeyi, filtreleri sıfırlamayı veya yeni bir lobi kurmayı deneyebilirsiniz."}
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-center gap-3 pt-2">
+                    {searchQuery || filterVisibility !== "ALL" ? (
+                      <Button 
+                        variant="outline" 
+                        onClick={() => { setSearchQuery(""); setFilterVisibility("ALL"); }}
+                        className="brutal-border border-2 font-black text-xs uppercase bg-white hover:bg-gray-100 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer"
+                      >
+                        Filtreleri Temizle
+                      </Button>
+                    ) : null}
+                    <Button 
+                      onClick={() => setIsCreateModalOpen(true)}
+                      className="bg-[#4ADE80] text-black hover:bg-[#22c55e] brutal-border border-2 font-black text-xs uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4 mr-1 stroke-[3]" /> Yeni Lobi Oluştur
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 paginatedLobbies.map((lobby, index) => {
                   const bgClass = bgColors[index % bgColors.length];
                   const isJoiningPrivate = joinLobbyId === lobby.id;
-                  const topBarColors = ["bg-[#FB923C]", "bg-[#F472B6]", "bg-[#FEF08A]", "bg-[#4ADE80]"];
-                  const accentColor = topBarColors[index % topBarColors.length];
+                  const lobbyTheme = getLobbyTheme(lobby.theme);
+                  const accentColor = lobbyTheme.accentColor;
                   
                   return (
                     <Card 
@@ -337,14 +365,19 @@ export default function LobbiesPage() {
                       style={{ animationDelay: `${(index % 6) * 60}ms` }}
                     >
                       {/* Full card hover linear sweep */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-[#FEF08A]/40 via-[#FB923C]/25 to-[#F472B6]/40 scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300 pointer-events-none z-0" />
+                      <div className={`absolute inset-0 ${lobbyTheme.headerGradient} opacity-20 scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300 pointer-events-none z-0`} />
 
                       {/* Top linear accent line */}
                       <div className={`absolute top-0 left-0 right-0 h-2 ${accentColor} scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-200 z-10`} />
 
                       <CardHeader className="pb-2 relative z-10 pt-5">
                         <div className="flex justify-between items-start gap-2">
-                          <CardTitle className="text-xl font-black line-clamp-1 text-black">{lobby.name}</CardTitle>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-8 h-8 rounded-sm bg-white border-2 border-black flex items-center justify-center text-base shadow-[2px_2px_0_0_#000] shrink-0" title="Lobi İkonu">
+                              {lobby.icon || "💬"}
+                            </span>
+                            <CardTitle className="text-xl font-black line-clamp-1 text-black">{lobby.name}</CardTitle>
+                          </div>
                           <Badge 
                             className={`font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] shrink-0 ${
                               lobby.visibility === "PRIVATE" ? "bg-[#F472B6] text-black" : "bg-white text-black"
@@ -360,6 +393,12 @@ export default function LobbiesPage() {
                         <CardDescription className="text-black/80 font-bold line-clamp-2 text-sm mt-1">
                           {lobby.description || "Açıklama belirtilmemiş."}
                         </CardDescription>
+                        {lobby.announcement && (
+                          <div className="mt-1 text-[11px] font-bold text-black/90 bg-[#FEF9C3] border border-black/40 px-2 py-0.5 rounded-xs line-clamp-1 flex items-center gap-1">
+                            <span>📢</span>
+                            <span className="truncate">{lobby.announcement}</span>
+                          </div>
+                        )}
                       </CardHeader>
 
                       <CardContent className="mt-auto pb-3 relative z-10">

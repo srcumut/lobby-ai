@@ -5,7 +5,6 @@ import { TriviaQuestion, getRandomQuestions } from "@/lib/triviaQuestions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, Clock, Zap, X, Award, CheckCircle2, XCircle } from "lucide-react";
-import { playBlipSound, playPointSound, playHitSound, playWinSound } from "@/lib/arcadeSounds";
 
 export interface TriviaPlayerScore {
   userId: string;
@@ -74,7 +73,6 @@ export function LobbyTrivia({
     });
 
     onAnnounceToChat?.(`🧠 ${currentUsername} canlı TRIVIA Bilgi Yarışması başlattı! (5 Soru)`);
-    playBlipSound();
   };
 
   // Listen to incoming game events from other users
@@ -93,7 +91,6 @@ export function LobbyTrivia({
       setScores({
         [sender_id]: { username: sender_username, score: 0 },
       });
-      playBlipSound();
     } else if (data.type === "trivia_answer") {
       const { points, isCorrect } = data;
       setScores((prev) => {
@@ -150,7 +147,6 @@ export function LobbyTrivia({
 
   const handleTimeExpired = () => {
     setIsRevealed(true);
-    playHitSound();
     advanceToNextQuestion();
   };
 
@@ -163,12 +159,6 @@ export function LobbyTrivia({
     const currentQ = questions[currentQIndex];
     const isCorrect = idx === currentQ.correctIndex;
     const earnedPoints = isCorrect ? 100 + timeLeft * 10 : 0;
-
-    if (isCorrect) {
-      playPointSound();
-    } else {
-      playHitSound();
-    }
 
     // Update local score
     setScores((prev) => {
@@ -211,7 +201,6 @@ export function LobbyTrivia({
       } else {
         // Finished all questions
         setIsFinished(true);
-        playWinSound();
         sendGameAction({
           type: "trivia_finished",
           scores,

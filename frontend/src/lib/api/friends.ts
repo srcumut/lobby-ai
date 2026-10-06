@@ -1,5 +1,6 @@
 import { apiClient } from './client';
 import { UserInfo } from '../../types';
+import { trackQuestAction } from '@/data/dailyQuests';
 
 export interface FriendRequestPayload {
   username: string;
@@ -28,6 +29,7 @@ export const friendsApi = {
 
   sendFriendRequest: async (payload: FriendRequestPayload): Promise<FriendRequestResponse> => {
     const response = await apiClient.post<FriendRequestResponse>('/friends/request', payload);
+    trackQuestAction("social_interaction");
     return response.data;
   },
 
@@ -38,6 +40,7 @@ export const friendsApi = {
 
   acceptRequest: async (requestId: string): Promise<void> => {
     await apiClient.post(`/friends/request/${requestId}/accept`);
+    trackQuestAction("social_interaction");
   },
 
   rejectRequest: async (requestId: string): Promise<void> => {

@@ -9,7 +9,6 @@ import React, { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
-import { playWinSound, playPointSound } from "@/lib/arcadeSounds";
 import { 
   MessageSquarePlus, 
   X, 
@@ -83,7 +82,6 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
       existing.push(feedbackRecord);
       localStorage.setItem("lobby-ai:feedback-log", JSON.stringify(existing));
 
-      playWinSound();
       setIsSuccess(true);
       toast.add({
         title: "Geri Bildiriminiz Alındı! 🚀",
@@ -157,7 +155,6 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
                       key={t.id}
                       type="button"
                       onClick={() => {
-                        playPointSound();
                         setType(t.id);
                       }}
                       className={`
@@ -188,7 +185,6 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
                       key={m.value}
                       type="button"
                       onClick={() => {
-                        playPointSound();
                         setMood(m.value);
                       }}
                       className={`

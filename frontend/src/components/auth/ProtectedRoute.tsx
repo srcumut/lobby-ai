@@ -1,18 +1,30 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push("/login");
+      const isAuthPage =
+        pathname === "/login" ||
+        pathname?.startsWith("/login/") ||
+        pathname === "/register" ||
+        pathname?.startsWith("/register/");
+
+      const redirectQuery =
+        !isAuthPage && pathname && pathname !== "/"
+          ? `?redirect=${encodeURIComponent(pathname)}`
+          : "";
+
+      router.push(`/login${redirectQuery}`);
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, router, pathname]);
 
   if (isLoading || !isAuthenticated) {
     return (

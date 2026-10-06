@@ -212,9 +212,21 @@
     animation: slide-down 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
-  .animate-pop-in {
-    animation: pop-in 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+  @keyframes page-reveal {
+    0% {
+      opacity: 0;
+      transform: translateY(12px) scale(0.995);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
+
+  .animate-page-enter {
+    animation: page-reveal 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
 
   .delay-75 { animation-delay: 100ms; }
   .delay-100 { animation-delay: 150ms; }
@@ -342,4 +354,968 @@
 .animate-typing-3 {
   animation: typing-dot 1.2s infinite ease-in-out !important;
   animation-delay: 0.4s !important;
+}
+
+/* ============================================================================
+   AVATAR LOOP ANIMATIONS (Kozmik Nefes, Glitch, Ateş Haresi, Prizma Shimmer)
+   ============================================================================ */
+@keyframes avatar-breathe-loop {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0px rgba(56, 189, 248, 0));
+  }
+  50% {
+    transform: scale(1.07);
+    filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.75)) drop-shadow(0 0 18px rgba(168, 85, 247, 0.5));
+  }
+}
+.anim-avatar-breathe {
+  animation: avatar-breathe-loop 3.5s ease-in-out infinite !important;
+}
+
+@keyframes avatar-glitch-loop {
+  0%, 88%, 100% {
+    transform: translate(0, 0);
+    filter: none;
+  }
+  90% {
+    transform: translate(-2px, 1px);
+    filter: drop-shadow(2px 0 #06B6D4) drop-shadow(-2px 0 #EF4444);
+  }
+  92% {
+    transform: translate(2px, -1px);
+    filter: drop-shadow(-2px 0 #06B6D4) drop-shadow(2px 0 #A855F7);
+  }
+  94% {
+    transform: translate(-1px, 2px);
+    filter: none;
+  }
+  96% {
+    transform: translate(1px, -1px);
+    filter: drop-shadow(2px 0 #22C55E);
+  }
+}
+.anim-avatar-glitch {
+  animation: avatar-glitch-loop 3s ease-in-out infinite !important;
+}
+
+@keyframes avatar-flame-loop {
+  0%, 100% {
+    filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.7)) drop-shadow(0 -4px 10px rgba(249, 115, 22, 0.6));
+    transform: scale(1) translateY(0);
+  }
+  50% {
+    filter: drop-shadow(0 0 14px rgba(249, 115, 22, 0.9)) drop-shadow(0 -6px 16px rgba(234, 179, 8, 0.8));
+    transform: scale(1.04) translateY(-1.5px);
+  }
+}
+.anim-avatar-flame {
+  animation: avatar-flame-loop 2s ease-in-out infinite !important;
+}
+
+@keyframes avatar-shimmer-loop {
+  0% {
+    filter: hue-rotate(0deg) drop-shadow(0 0 6px rgba(236, 72, 153, 0.6));
+  }
+  50% {
+    filter: hue-rotate(180deg) drop-shadow(0 0 12px rgba(6, 182, 212, 0.8));
+  }
+  100% {
+    filter: hue-rotate(360deg) drop-shadow(0 0 6px rgba(236, 72, 153, 0.6));
+  }
+}
+.anim-avatar-shimmer {
+  animation: avatar-shimmer-loop 4s linear infinite !important;
+}
+
+/* ============================================================================
+   PROJECT-WIDE THEME: DERİN GALAKSİ (Koyu Galaksi Mavisi & Mor)
+   ============================================================================ */
+.theme-deep-galaxy,
+[data-theme="deep-galaxy"] {
+  --background: #070B14;
+  --foreground: #F8FAFC;
+  --card: #0B1120;
+  --card-foreground: #F8FAFC;
+  --popover: #0B1120;
+  --popover-foreground: #F8FAFC;
+  --border: #334155;
+  --input: #1E293B;
+  --ring: #38BDF8;
+  --muted: #1E293B;
+  --muted-foreground: #94A3B8;
+  --accent: #2E1065;
+  --accent-foreground: #F8FAFC;
+  background-color: #070B14 !important;
+  color: #F8FAFC !important;
+}
+
+.theme-deep-galaxy ::-webkit-scrollbar-track,
+[data-theme="deep-galaxy"] ::-webkit-scrollbar-track {
+  background: #0B1120 !important;
+  border-left: 2px solid #1E293B !important;
+  border-top: 2px solid #1E293B !important;
+}
+
+.theme-deep-galaxy ::-webkit-scrollbar-thumb,
+[data-theme="deep-galaxy"] ::-webkit-scrollbar-thumb {
+  background: #7C3AED !important;
+  border: 2px solid #070B14 !important;
+  box-shadow: 1px 1px 0px 0px #38BDF8 !important;
+}
+
+.theme-deep-galaxy ::-webkit-scrollbar-thumb:hover,
+[data-theme="deep-galaxy"] ::-webkit-scrollbar-thumb:hover {
+  background: #9333EA !important;
+}
+
+/* Galaxy backdrop ambient effects */
+.theme-deep-galaxy .bg-tech-grid,
+[data-theme="deep-galaxy"] .bg-tech-grid {
+  background-image: 
+    radial-gradient(rgba(56, 189, 248, 0.15) 1px, transparent 1px),
+    radial-gradient(rgba(168, 85, 247, 0.12) 1px, transparent 1px) !important;
+  background-size: 32px 32px, 64px 64px !important;
+  background-position: 0 0, 16px 16px !important;
+}
+
+/* ----------------------------------------------------------------------------
+   TOPBAR / NAVBAR OVERRIDES IN DEEP GALAXY
+   ---------------------------------------------------------------------------- */
+.theme-deep-galaxy header,
+[data-theme="deep-galaxy"] header {
+  background-color: #070B14 !important;
+  border-bottom-color: #1E293B !important;
+}
+
+.theme-deep-galaxy header > div:first-child,
+[data-theme="deep-galaxy"] header > div:first-child {
+  /* Top accent gradient bar */
+  background: linear-gradient(to right, #06B6D4, #8B5CF6, #EC4899) !important;
+}
+
+/* Logo Left Area */
+.theme-deep-galaxy .topbar-logo-area,
+[data-theme="deep-galaxy"] .topbar-logo-area {
+  background-color: #070B14 !important;
+  border-color: #1E293B !important;
+}
+
+/* Logo "LOBBY" block: Electric cosmic navy with neon cyan brutal border */
+.theme-deep-galaxy .logo-lobby-box,
+[data-theme="deep-galaxy"] .logo-lobby-box {
+  background-color: #1E1B4B !important;
+  border-color: #38BDF8 !important;
+  box-shadow: 2.5px 2.5px 0 0 #06B6D4 !important;
+}
+.theme-deep-galaxy .logo-lobby-box span,
+[data-theme="deep-galaxy"] .logo-lobby-box span {
+  color: #38BDF8 !important;
+}
+
+/* Logo "AI" block: Deep cosmic purple with neon violet brutal border */
+.theme-deep-galaxy .logo-ai-box,
+[data-theme="deep-galaxy"] .logo-ai-box {
+  background-color: #2E1065 !important;
+  border-color: #C084FC !important;
+  box-shadow: 2.5px 2.5px 0 0 #A855F7 !important;
+}
+.theme-deep-galaxy .logo-ai-box span,
+[data-theme="deep-galaxy"] .logo-ai-box span,
+.theme-deep-galaxy .logo-ai-box span:first-child,
+[data-theme="deep-galaxy"] .logo-ai-box span:first-child {
+  color: #F5D0FE !important;
+}
+
+/* Page title in TopBar */
+.theme-deep-galaxy .topbar-title,
+[data-theme="deep-galaxy"] .topbar-title {
+  color: #F8FAFC !important;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.3);
+}
+
+/* Search bar in TopBar */
+.theme-deep-galaxy .topbar-search-btn,
+[data-theme="deep-galaxy"] .topbar-search-btn {
+  background-color: #0B1120 !important;
+  border-color: #334155 !important;
+  box-shadow: 2px 2px 0 0 #1E293B !important;
+  color: #94A3B8 !important;
+}
+.theme-deep-galaxy .topbar-search-btn:hover,
+[data-theme="deep-galaxy"] .topbar-search-btn:hover {
+  background-color: #0F172A !important;
+  border-color: #38BDF8 !important;
+  box-shadow: 3px 3px 0 0 #06B6D4 !important;
+}
+.theme-deep-galaxy .topbar-search-btn span,
+[data-theme="deep-galaxy"] .topbar-search-btn span {
+  color: #94A3B8 !important;
+}
+.theme-deep-galaxy .topbar-search-btn:hover span,
+[data-theme="deep-galaxy"] .topbar-search-btn:hover span {
+  color: #F8FAFC !important;
+}
+.theme-deep-galaxy .topbar-search-btn kbd,
+[data-theme="deep-galaxy"] .topbar-search-btn kbd {
+  background-color: #2E1065 !important;
+  color: #38BDF8 !important;
+  border-color: #818CF8 !important;
+}
+
+/* Quests & TopBar Buttons */
+.theme-deep-galaxy [data-testid="nav-quests-button"],
+[data-theme="deep-galaxy"] [data-testid="nav-quests-button"] {
+  background-color: #10B981 !important;
+  color: #000000 !important;
+  border-color: #000000 !important;
+  box-shadow: 2px 2px 0 0 #000000 !important;
+}
+.theme-deep-galaxy [data-testid="nav-quests-button"]:hover,
+[data-theme="deep-galaxy"] [data-testid="nav-quests-button"]:hover {
+  background-color: #059669 !important;
+  color: #000000 !important;
+}
+.theme-deep-galaxy [data-testid="nav-quests-button"] *,
+[data-theme="deep-galaxy"] [data-testid="nav-quests-button"] * {
+  color: #000000 !important;
+  stroke: #000000 !important;
+}
+
+/* TopBar Coin Pill */
+.theme-deep-galaxy .topbar-coin-pill,
+[data-theme="deep-galaxy"] .topbar-coin-pill {
+  background-color: #0B1120 !important;
+  border-color: #334155 !important;
+  box-shadow: 2px 2px 0 0 #1E293B !important;
+}
+.theme-deep-galaxy .topbar-coin-pill span:last-child,
+[data-theme="deep-galaxy"] .topbar-coin-pill span:last-child {
+  color: #FDE047 !important;
+}
+
+/* ----------------------------------------------------------------------------
+   SIDEBAR OVERRIDES IN DEEP GALAXY
+   ---------------------------------------------------------------------------- */
+.theme-deep-galaxy aside,
+[data-theme="deep-galaxy"] aside {
+  background-color: #070B14 !important;
+  border-right-color: #1E293B !important;
+}
+
+.theme-deep-galaxy .sidebar-mobile-header,
+[data-theme="deep-galaxy"] .sidebar-mobile-header {
+  background-color: #0B1120 !important;
+  border-color: #1E293B !important;
+}
+
+/* Inactive nav item in sidebar */
+.theme-deep-galaxy .sidebar-nav-link:not(.sidebar-nav-active),
+[data-theme="deep-galaxy"] .sidebar-nav-link:not(.sidebar-nav-active) {
+  background-color: #0B1120 !important;
+  border-color: #1E293B !important;
+  color: #E2E8F0 !important;
+}
+.theme-deep-galaxy .sidebar-nav-link:not(.sidebar-nav-active):hover,
+[data-theme="deep-galaxy"] .sidebar-nav-link:not(.sidebar-nav-active):hover {
+  background-color: #1E1B4B !important;
+  border-color: #38BDF8 !important;
+  color: #38BDF8 !important;
+  box-shadow: 3px 3px 0 0 #38BDF8 !important;
+}
+
+/* Active nav item in sidebar */
+.theme-deep-galaxy .sidebar-nav-active,
+[data-theme="deep-galaxy"] .sidebar-nav-active {
+  background: linear-gradient(135deg, #2E1065 0%, #1E1B4B 100%) !important;
+  border-color: #38BDF8 !important;
+  color: #38BDF8 !important;
+  box-shadow: 2.5px 2.5px 0 0 #818CF8 !important;
+}
+
+/* Section titles in sidebar */
+.theme-deep-galaxy .sidebar-section-heading,
+[data-theme="deep-galaxy"] .sidebar-section-heading {
+  color: #C084FC !important;
+}
+
+/* Friends pending box */
+.theme-deep-galaxy .sidebar-pending-box,
+[data-theme="deep-galaxy"] .sidebar-pending-box {
+  background-color: #2E1065 !important;
+  border-color: #818CF8 !important;
+  color: #F5D0FE !important;
+}
+
+/* Empty friends box */
+.theme-deep-galaxy .sidebar-empty-box,
+[data-theme="deep-galaxy"] .sidebar-empty-box {
+  background-color: #0B1120 !important;
+  border-color: #334155 !important;
+  color: #94A3B8 !important;
+}
+
+/* Sidebar profile bottom box */
+.theme-deep-galaxy .sidebar-profile-box,
+[data-theme="deep-galaxy"] .sidebar-profile-box {
+  background-color: #0B1120 !important;
+  border-top-color: #1E293B !important;
+}
+.theme-deep-galaxy .sidebar-profile-box p:first-child,
+[data-theme="deep-galaxy"] .sidebar-profile-box p:first-child {
+  color: #F8FAFC !important;
+}
+.theme-deep-galaxy .sidebar-profile-box p:last-child,
+[data-theme="deep-galaxy"] .sidebar-profile-box p:last-child {
+  color: #94A3B8 !important;
+}
+.theme-deep-galaxy .sidebar-profile-btn,
+[data-theme="deep-galaxy"] .sidebar-profile-btn {
+  background-color: #2E1065 !important;
+  border-color: #818CF8 !important;
+  color: #38BDF8 !important;
+  box-shadow: 2px 2px 0 0 #818CF8 !important;
+}
+.theme-deep-galaxy .sidebar-profile-btn *,
+[data-theme="deep-galaxy"] .sidebar-profile-btn * {
+  color: #38BDF8 !important;
+  stroke: #38BDF8 !important;
+}
+.theme-deep-galaxy .sidebar-logout-btn,
+[data-theme="deep-galaxy"] .sidebar-logout-btn {
+  background-color: #450A0A !important;
+  border-color: #EF4444 !important;
+  color: #FCA5A5 !important;
+  box-shadow: 2px 2px 0 0 #EF4444 !important;
+}
+
+/* ============================================================================
+   UNIVERSAL DEEP GALAXY THEME REFINEMENT:
+   1. Dark Galaxy Base: Koyu Galaksi Mavisi (#0B1120 / #070B14)
+   2. Clean Architectural Borders: Slate-700 (#334155 / #1E293B) instead of harsh white glare
+   3. Solid Obsidian Shadows: Deep neo-brutalist 3D shadows (#020617)
+   4. High-Contrast Legibility: Black text on light buttons & hovers, Crisp White on dark cards
+   ============================================================================ */
+
+/* 1. PANELS, CARDS, CONTAINERS & DIALOGS -> KOYU GALAKSİ MAVİSİ */
+.theme-deep-galaxy .bg-white:not(button):not(a):not(.badge-keep-light),
+[data-theme="deep-galaxy"] .bg-white:not(button):not(a):not(.badge-keep-light),
+.theme-deep-galaxy [class*="bg-[#FDFBF7]"],
+[data-theme="deep-galaxy"] [class*="bg-[#FDFBF7]"],
+.theme-deep-galaxy [class*="bg-[#FAF8F0]"],
+[data-theme="deep-galaxy"] [class*="bg-[#FAF8F0]"],
+.theme-deep-galaxy [class*="bg-[#F4F0E6]"],
+[data-theme="deep-galaxy"] [class*="bg-[#F4F0E6]"],
+.theme-deep-galaxy [class*="bg-[#FAF9F6]"],
+[data-theme="deep-galaxy"] [class*="bg-[#FAF9F6]"],
+.theme-deep-galaxy [class*="bg-[#F3F4F6]"]:not(button):not(a),
+[data-theme="deep-galaxy"] [class*="bg-[#F3F4F6]"]:not(button):not(a),
+.theme-deep-galaxy [class*="bg-[#FFFDF5]"],
+[data-theme="deep-galaxy"] [class*="bg-[#FFFDF5]"],
+.theme-deep-galaxy [class*="bg-[#f8fafc]"],
+[data-theme="deep-galaxy"] [class*="bg-[#f8fafc]"],
+.theme-deep-galaxy [class*="bg-[#f4f4f5]"],
+[data-theme="deep-galaxy"] [class*="bg-[#f4f4f5]"],
+.theme-deep-galaxy [class*="bg-[#FEF9C3]"]:not(button):not(span),
+[data-theme="deep-galaxy"] [class*="bg-[#FEF9C3]"]:not(button):not(span),
+.theme-deep-galaxy [class*="bg-[#FCE7F3]"]:not(button):not(span),
+[data-theme="deep-galaxy"] [class*="bg-[#FCE7F3]"]:not(button):not(span),
+.theme-deep-galaxy [class*="bg-[#FFEDD5]"]:not(button):not(span),
+[data-theme="deep-galaxy"] [class*="bg-[#FFEDD5]"]:not(button):not(span),
+.theme-deep-galaxy [class*="bg-[#FDF2F8]"]:not(button):not(span),
+[data-theme="deep-galaxy"] [class*="bg-[#FDF2F8]"]:not(button):not(span),
+.theme-deep-galaxy [class*="bg-[#FFF7ED]"]:not(button):not(span),
+[data-theme="deep-galaxy"] [class*="bg-[#FFF7ED]"]:not(button):not(span),
+.theme-deep-galaxy [class*="bg-[#FFE4E6]"]:not(button):not(span),
+[data-theme="deep-galaxy"] [class*="bg-[#FFE4E6]"]:not(button):not(span),
+.theme-deep-galaxy [class*="bg-[#E0F4FF]"]:not(button):not(span),
+[data-theme="deep-galaxy"] [class*="bg-[#E0F4FF]"]:not(button):not(span),
+.theme-deep-galaxy [class*="bg-[#CFFAFE]"]:not(button):not(span):not([class*="px-1.5"]),
+[data-theme="deep-galaxy"] [class*="bg-[#CFFAFE]"]:not(button):not(span):not([class*="px-1.5"]),
+.theme-deep-galaxy [class*="bg-[#EDE9FE]"]:not(button):not(span),
+[data-theme="deep-galaxy"] [class*="bg-[#EDE9FE]"]:not(button):not(span),
+/* ============================================================================
+   DIALOGS, ALERTS, POPOVERS & DROPDOWNS IN DEEP GALAXY
+   ============================================================================ */
+.theme-deep-galaxy [role="dialog"],
+[data-theme="deep-galaxy"] [role="dialog"],
+.theme-deep-galaxy [data-slot="dialog-content"],
+[data-theme="deep-galaxy"] [data-slot="dialog-content"],
+.theme-deep-galaxy [data-slot="alert-dialog-content"],
+[data-theme="deep-galaxy"] [data-slot="alert-dialog-content"],
+.theme-deep-galaxy [data-slot="dropdown-menu-content"],
+[data-theme="deep-galaxy"] [data-slot="dropdown-menu-content"],
+.theme-deep-galaxy [data-slot="popover-content"],
+[data-theme="deep-galaxy"] [data-slot="popover-content"],
+.theme-deep-galaxy [data-radix-popper-content-wrapper] > div,
+[data-theme="deep-galaxy"] [data-radix-popper-content-wrapper] > div {
+  background-color: #0B1120 !important;
+  color: #F8FAFC !important;
+  border-color: #334155 !important;
+  box-shadow: 6px 6px 0px 0px #020617 !important;
+}
+
+/* Dialog Header, Titles, Descriptions & Close button */
+.theme-deep-galaxy [data-slot="dialog-content"] h1,
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] h1,
+.theme-deep-galaxy [data-slot="dialog-content"] h2,
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] h2,
+.theme-deep-galaxy [data-slot="dialog-content"] h3,
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] h3,
+.theme-deep-galaxy [data-slot="dialog-content"] [data-slot="dialog-title"],
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] [data-slot="dialog-title"],
+.theme-deep-galaxy [data-slot="alert-dialog-content"] [data-slot="alert-dialog-title"],
+[data-theme="deep-galaxy"] [data-slot="alert-dialog-content"] [data-slot="alert-dialog-title"] {
+  color: #F8FAFC !important;
+}
+
+.theme-deep-galaxy [data-slot="dialog-content"] [data-slot="dialog-description"],
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] [data-slot="dialog-description"],
+.theme-deep-galaxy [data-slot="alert-dialog-content"] [data-slot="alert-dialog-description"],
+[data-theme="deep-galaxy"] [data-slot="alert-dialog-content"] [data-slot="alert-dialog-description"] {
+  color: #94A3B8 !important;
+}
+
+.theme-deep-galaxy [data-slot="dialog-content"] [data-slot="dialog-close"],
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] [data-slot="dialog-close"] {
+  color: #94A3B8 !important;
+}
+.theme-deep-galaxy [data-slot="dialog-content"] [data-slot="dialog-close"]:hover,
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] [data-slot="dialog-close"]:hover {
+  color: #F8FAFC !important;
+  background-color: #1E293B !important;
+}
+
+/* Inner subcards and sections inside dialogs */
+.theme-deep-galaxy [data-slot="dialog-content"] .bg-white:not(button):not(span),
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] .bg-white:not(button):not(span),
+.theme-deep-galaxy [data-slot="dialog-content"] [class*="bg-gray-50"]:not(button),
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] [class*="bg-gray-50"]:not(button),
+.theme-deep-galaxy [data-slot="dialog-content"] [class*="bg-neutral-50"]:not(button),
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] [class*="bg-neutral-50"]:not(button),
+.theme-deep-galaxy [data-slot="dialog-content"] [class*="bg-[#FDFBF7]"],
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] [class*="bg-[#FDFBF7]"],
+.theme-deep-galaxy [data-slot="dialog-content"] [class*="bg-[#FAF8F0]"],
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] [class*="bg-[#FAF8F0]"],
+.theme-deep-galaxy [data-slot="dialog-content"] [class*="bg-[#F4F4F5]"]:not(button),
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] [class*="bg-[#F4F4F5]"]:not(button) {
+  background-color: #0F172A !important;
+  color: #F8FAFC !important;
+  border-color: #334155 !important;
+}
+
+/* Subcard text and labels inside dialogs */
+.theme-deep-galaxy [data-slot="dialog-content"] label,
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] label,
+.theme-deep-galaxy [data-slot="dialog-content"] p,
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] p {
+  color: #F8FAFC !important;
+}
+.theme-deep-galaxy [data-slot="dialog-content"] p.text-gray-500,
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] p.text-gray-500,
+.theme-deep-galaxy [data-slot="dialog-content"] p.text-gray-600,
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] p.text-gray-600,
+.theme-deep-galaxy [data-slot="dialog-content"] span.text-gray-500,
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] span.text-gray-500 {
+  color: #94A3B8 !important;
+}
+
+/* Tab lists inside dialogs */
+.theme-deep-galaxy [data-slot="dialog-content"] [role="tablist"],
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] [role="tablist"] {
+  background-color: #070B14 !important;
+  border-color: #1E293B !important;
+}
+.theme-deep-galaxy [data-slot="dialog-content"] [role="tab"]:not([data-state="active"]),
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] [role="tab"]:not([data-state="active"]) {
+  color: #94A3B8 !important;
+  background-color: transparent !important;
+}
+.theme-deep-galaxy [data-slot="dialog-content"] [role="tab"]:not([data-state="active"]):hover,
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] [role="tab"]:not([data-state="active"]):hover {
+  color: #F8FAFC !important;
+  background-color: #0F172A !important;
+}
+
+/* Buttons inside dialogs */
+.theme-deep-galaxy [data-slot="dialog-content"] button.bg-white,
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] button.bg-white {
+  background-color: #0F172A !important;
+  color: #F8FAFC !important;
+  border-color: #334155 !important;
+}
+.theme-deep-galaxy [data-slot="dialog-content"] button.bg-white:hover,
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] button.bg-white:hover {
+  background-color: #1E1B4B !important;
+  color: #38BDF8 !important;
+  border-color: #38BDF8 !important;
+}
+
+.theme-deep-galaxy [data-slot="dialog-content"] button[class*="bg-[#FEF08A]"],
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] button[class*="bg-[#FEF08A]"],
+.theme-deep-galaxy [data-slot="dialog-content"] button[class*="bg-[#FDE047]"],
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] button[class*="bg-[#FDE047]"],
+.theme-deep-galaxy [data-slot="dialog-content"] button[class*="bg-[#4ADE80]"],
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] button[class*="bg-[#4ADE80]"] {
+  color: #000000 !important;
+}
+.theme-deep-galaxy [data-slot="dialog-content"] button[class*="bg-[#FEF08A]"] *,
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] button[class*="bg-[#FEF08A]"] *,
+.theme-deep-galaxy [data-slot="dialog-content"] button[class*="bg-[#FDE047]"] *,
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] button[class*="bg-[#FDE047]"] *,
+.theme-deep-galaxy [data-slot="dialog-content"] button[class*="bg-[#4ADE80]"] *,
+[data-theme="deep-galaxy"] [data-slot="dialog-content"] button[class*="bg-[#4ADE80]"] * {
+  color: #000000 !important;
+  stroke: #000000 !important;
+}
+
+/* 2. FORM GİRDİLERİ (INPUT, TEXTAREA, SELECT) */
+.theme-deep-galaxy input:not([type="checkbox"]):not([type="radio"]),
+[data-theme="deep-galaxy"] input:not([type="checkbox"]):not([type="radio"]),
+.theme-deep-galaxy textarea,
+[data-theme="deep-galaxy"] textarea,
+.theme-deep-galaxy select,
+[data-theme="deep-galaxy"] select {
+  background-color: #0F172A !important;
+  color: #F8FAFC !important;
+  border-color: #334155 !important;
+}
+.theme-deep-galaxy input:focus,
+[data-theme="deep-galaxy"] input:focus,
+.theme-deep-galaxy textarea:focus,
+[data-theme="deep-galaxy"] textarea:focus {
+  border-color: #38BDF8 !important;
+  box-shadow: 2px 2px 0 0 #06B6D4 !important;
+  outline: none !important;
+}
+.theme-deep-galaxy input::placeholder,
+[data-theme="deep-galaxy"] input::placeholder,
+.theme-deep-galaxy textarea::placeholder,
+[data-theme="deep-galaxy"] textarea::placeholder {
+  color: #64748B !important;
+}
+
+/* 3. KENARLIKLAR (BORDERS & OUTLINES):
+   Sert, göz yoran beyaz outline'lar yerine Slate-700/Slate-800 (#334155 / #1E293B) */
+.theme-deep-galaxy .border-black,
+[data-theme="deep-galaxy"] .border-black,
+.theme-deep-galaxy [class*="border-black"]:not([class*="border-black/"]),
+[data-theme="deep-galaxy"] [class*="border-black"]:not([class*="border-black/"]),
+.theme-deep-galaxy .brutal-border,
+[data-theme="deep-galaxy"] .brutal-border,
+.theme-deep-galaxy .border-neutral-900,
+[data-theme="deep-galaxy"] .border-neutral-900,
+.theme-deep-galaxy .border-gray-900,
+[data-theme="deep-galaxy"] .border-gray-900,
+.theme-deep-galaxy .border-slate-900,
+[data-theme="deep-galaxy"] .border-slate-900 {
+  border-color: #334155 !important;
+}
+
+/* İnce ayraçlar ve alt çizgiler */
+.theme-deep-galaxy [class*="border-black/10"],
+[data-theme="deep-galaxy"] [class*="border-black/10"],
+.theme-deep-galaxy [class*="border-black/15"],
+[data-theme="deep-galaxy"] [class*="border-black/15"],
+.theme-deep-galaxy [class*="border-black/20"],
+[data-theme="deep-galaxy"] [class*="border-black/20"] {
+  border-color: #1E293B !important;
+}
+
+/* 4. BRUTALİST GÖLGELER:
+   Göz alan beyaz parlamalar yerine koyu kozmik derinlik (#020617) */
+.theme-deep-galaxy .brutal-shadow,
+[data-theme="deep-galaxy"] .brutal-shadow {
+  box-shadow: 4px 4px 0px 0px #020617 !important;
+}
+.theme-deep-galaxy .brutal-shadow-sm,
+[data-theme="deep-galaxy"] .brutal-shadow-sm {
+  box-shadow: 2px 2px 0px 0px #020617 !important;
+}
+.theme-deep-galaxy .brutal-shadow-lg,
+[data-theme="deep-galaxy"] .brutal-shadow-lg {
+  box-shadow: 6px 6px 0px 0px #020617 !important;
+}
+.theme-deep-galaxy [class*="shadow-\["][class*="0_0_#000"],
+[data-theme="deep-galaxy"] [class*="shadow-\["][class*="0_0_#000"],
+.theme-deep-galaxy [class*="shadow-\["][class*="rgba(0,0,0"],
+[data-theme="deep-galaxy"] [class*="shadow-\["][class*="rgba(0,0,0"] {
+  box-shadow: 3px 3px 0px 0px #020617 !important;
+}
+
+/* 5. KOYU YÜZEYLERDEKİ METİNLER (CRISP WHITE & CONTRAST GRAPHS) */
+.theme-deep-galaxy .text-black,
+[data-theme="deep-galaxy"] .text-black,
+.theme-deep-galaxy .text-neutral-900,
+[data-theme="deep-galaxy"] .text-neutral-900,
+.theme-deep-galaxy .text-gray-900,
+[data-theme="deep-galaxy"] .text-gray-900,
+.theme-deep-galaxy .text-zinc-900,
+[data-theme="deep-galaxy"] .text-zinc-900,
+.theme-deep-galaxy .text-slate-900,
+[data-theme="deep-galaxy"] .text-slate-900 {
+  color: #F8FAFC !important;
+}
+
+.theme-deep-galaxy .text-gray-500,
+[data-theme="deep-galaxy"] .text-gray-500,
+.theme-deep-galaxy .text-gray-600,
+[data-theme="deep-galaxy"] .text-gray-600,
+.theme-deep-galaxy .text-gray-700,
+[data-theme="deep-galaxy"] .text-gray-700,
+.theme-deep-galaxy .text-slate-500,
+[data-theme="deep-galaxy"] .text-slate-500,
+.theme-deep-galaxy .text-slate-600,
+[data-theme="deep-galaxy"] .text-slate-600,
+.theme-deep-galaxy [class*="text-black/"],
+[data-theme="deep-galaxy"] [class*="text-black/"] {
+  color: #94A3B8 !important;
+}
+
+/* Lobi Başlık Bandı (Lobby Header Banner) Yüksek Kontrast */
+.theme-deep-galaxy .lobby-header-banner h1,
+[data-theme="deep-galaxy"] .lobby-header-banner h1,
+.theme-deep-galaxy .lobby-header-banner p,
+[data-theme="deep-galaxy"] .lobby-header-banner p,
+.theme-deep-galaxy .lobby-header-banner span.font-black,
+[data-theme="deep-galaxy"] .lobby-header-banner span.font-black {
+  color: #000000 !important;
+}
+
+/* 6. AÇIK RENKLİ BUTONLAR, ROZETLER VE VURGULAR (KESİNLİKLE SİYAH METİN) */
+.theme-deep-galaxy [class*="bg-[#FEF08A]"] h1,
+[data-theme="deep-galaxy"] [class*="bg-[#FEF08A]"] h1,
+.theme-deep-galaxy [class*="bg-[#FEF08A]"] h2,
+[data-theme="deep-galaxy"] [class*="bg-[#FEF08A]"] h2,
+.theme-deep-galaxy [class*="bg-[#FEF08A]"] h3,
+[data-theme="deep-galaxy"] [class*="bg-[#FEF08A]"] h3,
+.theme-deep-galaxy [class*="bg-[#FEF08A]"] p,
+[data-theme="deep-galaxy"] [class*="bg-[#FEF08A]"] p,
+.theme-deep-galaxy [class*="from-[#FEF08A]"] h1,
+[data-theme="deep-galaxy"] [class*="from-[#FEF08A]"] h1,
+.theme-deep-galaxy [class*="from-[#FEF08A]"] h2,
+[data-theme="deep-galaxy"] [class*="from-[#FEF08A]"] h2,
+.theme-deep-galaxy [class*="from-[#FEF08A]"] h3,
+[data-theme="deep-galaxy"] [class*="from-[#FEF08A]"] h3,
+.theme-deep-galaxy [class*="from-[#FEF08A]"] p,
+[data-theme="deep-galaxy"] [class*="from-[#FEF08A]"] p,
+.theme-deep-galaxy button[class*="bg-[#FEF08A]"]:not(.sidebar-profile-btn),
+[data-theme="deep-galaxy"] button[class*="bg-[#FEF08A]"]:not(.sidebar-profile-btn),
+.theme-deep-galaxy button[class*="bg-[#FDE047]"],
+[data-theme="deep-galaxy"] button[class*="bg-[#FDE047]"],
+.theme-deep-galaxy button[class*="bg-[#FACC15]"],
+[data-theme="deep-galaxy"] button[class*="bg-[#FACC15]"],
+.theme-deep-galaxy button[class*="bg-[#06B6D4]"],
+[data-theme="deep-galaxy"] button[class*="bg-[#06B6D4]"],
+.theme-deep-galaxy button[class*="bg-[#38BDF8]"],
+[data-theme="deep-galaxy"] button[class*="bg-[#38BDF8]"],
+.theme-deep-galaxy button[class*="bg-[#4ADE80]"],
+[data-theme="deep-galaxy"] button[class*="bg-[#4ADE80]"],
+.theme-deep-galaxy button[class*="bg-[#F472B6]"],
+[data-theme="deep-galaxy"] button[class*="bg-[#F472B6]"],
+.theme-deep-galaxy button[class*="bg-[#FB923C]"],
+[data-theme="deep-galaxy"] button[class*="bg-[#FB923C]"],
+.theme-deep-galaxy button[class*="bg-[#E0F2FE]"],
+[data-theme="deep-galaxy"] button[class*="bg-[#E0F2FE]"],
+.theme-deep-galaxy span[class*="bg-[#FEF08A]"],
+[data-theme="deep-galaxy"] span[class*="bg-[#FEF08A]"],
+.theme-deep-galaxy div[class*="bg-[#FEF08A]"]:not([class*="p-6"]):not([class*="p-5"]):not([class*="p-4"]):not(.logo-ai-box),
+[data-theme="deep-galaxy"] div[class*="bg-[#FEF08A]"]:not([class*="p-6"]):not([class*="p-5"]):not([class*="p-4"]):not(.logo-ai-box),
+.theme-deep-galaxy [class*="bg-[#F472B6]"]:not([class*="p-6"]):not([class*="p-5"]):not([class*="p-4"]),
+[data-theme="deep-galaxy"] [class*="bg-[#F472B6]"]:not([class*="p-6"]):not([class*="p-5"]):not([class*="p-4"]),
+.theme-deep-galaxy .avatar-picker-action-btn,
+[data-theme="deep-galaxy"] .avatar-picker-action-btn {
+  color: #000000 !important;
+}
+
+.theme-deep-galaxy [class*="bg-[#F472B6]"]:not([class*="p-6"]):not([class*="p-5"]):not([class*="p-4"]) *,
+[data-theme="deep-galaxy"] [class*="bg-[#F472B6]"]:not([class*="p-6"]):not([class*="p-5"]):not([class*="p-4"]) * {
+  color: #000000 !important;
+  stroke: #000000 !important;
+}
+
+/* Small pastel badges in deep galaxy */
+.theme-deep-galaxy span[class*="bg-[#E0F4FF]"],
+[data-theme="deep-galaxy"] span[class*="bg-[#E0F4FF]"],
+.theme-deep-galaxy span[class*="bg-[#CFFAFE]"],
+[data-theme="deep-galaxy"] span[class*="bg-[#CFFAFE]"] {
+  background-color: #1E293B !important;
+  color: #38BDF8 !important;
+  border-color: #38BDF8 !important;
+}
+.theme-deep-galaxy span[class*="bg-[#E0F4FF]"] *,
+[data-theme="deep-galaxy"] span[class*="bg-[#E0F4FF]"] *,
+.theme-deep-galaxy span[class*="bg-[#CFFAFE]"] *,
+[data-theme="deep-galaxy"] span[class*="bg-[#CFFAFE]"] * {
+  color: #38BDF8 !important;
+}
+
+/* Active messages tab */
+.theme-deep-galaxy button[class*="bg-[#FFE4E6]"],
+[data-theme="deep-galaxy"] button[class*="bg-[#FFE4E6]"] {
+  background-color: #2E1065 !important;
+  color: #38BDF8 !important;
+  border-color: #38BDF8 !important;
+}
+.theme-deep-galaxy button[class*="bg-[#FFE4E6]"] *,
+[data-theme="deep-galaxy"] button[class*="bg-[#FFE4E6]"] * {
+  color: #38BDF8 !important;
+  stroke: #38BDF8 !important;
+}
+
+/* Links and Badges with bg-white -> Invert to Cosmic Slate */
+.theme-deep-galaxy a.bg-white,
+[data-theme="deep-galaxy"] a.bg-white,
+.theme-deep-galaxy span.bg-white:not(.badge-keep-light),
+[data-theme="deep-galaxy"] span.bg-white:not(.badge-keep-light) {
+  background-color: #0F172A !important;
+  color: #F8FAFC !important;
+  border-color: #334155 !important;
+}
+.theme-deep-galaxy a.bg-white:hover,
+[data-theme="deep-galaxy"] a.bg-white:hover {
+  background-color: #1E1B4B !important;
+  color: #38BDF8 !important;
+  border-color: #38BDF8 !important;
+}
+.theme-deep-galaxy a.bg-white *,
+[data-theme="deep-galaxy"] a.bg-white *,
+.theme-deep-galaxy span.bg-white:not(.badge-keep-light) *,
+[data-theme="deep-galaxy"] span.bg-white:not(.badge-keep-light) * {
+  color: #F8FAFC !important;
+}
+.theme-deep-galaxy a.bg-white:hover *,
+[data-theme="deep-galaxy"] a.bg-white:hover * {
+  color: #38BDF8 !important;
+}
+
+/* Default Chat Bubbles in Deep Galaxy */
+.theme-deep-galaxy [class*="bg-[#f3e8ff]"]:not([class*="p-6"]):not([class*="p-5"]):not([class*="p-4"]),
+[data-theme="deep-galaxy"] [class*="bg-[#f3e8ff]"]:not([class*="p-6"]):not([class*="p-5"]):not([class*="p-4"]) {
+  background-color: #1E1B4B !important;
+  color: #38BDF8 !important;
+  border-color: #38BDF8 !important;
+}
+.theme-deep-galaxy [class*="bg-[#f3e8ff]"]:not([class*="p-6"]):not([class*="p-5"]):not([class*="p-4"]) *,
+[data-theme="deep-galaxy"] [class*="bg-[#f3e8ff]"]:not([class*="p-6"]):not([class*="p-5"]):not([class*="p-4"]) * {
+  color: #38BDF8 !important;
+}
+
+.theme-deep-galaxy [class*="bg-[#cffafe]"]:not([class*="p-6"]):not([class*="p-5"]):not([class*="p-4"]),
+[data-theme="deep-galaxy"] [class*="bg-[#cffafe]"]:not([class*="p-6"]):not([class*="p-5"]):not([class*="p-4"]) {
+  background-color: #083344 !important;
+  color: #67E8F9 !important;
+  border-color: #06B6D4 !important;
+}
+.theme-deep-galaxy [class*="bg-[#cffafe]"]:not([class*="p-6"]):not([class*="p-5"]):not([class*="p-4"]) *,
+[data-theme="deep-galaxy"] [class*="bg-[#cffafe]"]:not([class*="p-6"]):not([class*="p-5"]):not([class*="p-4"]) * {
+  color: #67E8F9 !important;
+}
+
+.theme-deep-galaxy .avatar-picker-action-btn,
+[data-theme="deep-galaxy"] .avatar-picker-action-btn {
+  background-color: #FEF08A !important;
+  color: #000000 !important;
+  border-color: #000000 !important;
+}
+.theme-deep-galaxy .avatar-picker-action-btn:hover,
+[data-theme="deep-galaxy"] .avatar-picker-action-btn:hover {
+  background-color: #FDE047 !important;
+  color: #000000 !important;
+}
+.theme-deep-galaxy .avatar-picker-action-btn *,
+[data-theme="deep-galaxy"] .avatar-picker-action-btn * {
+  color: #000000 !important;
+  stroke: #000000 !important;
+}
+
+.theme-deep-galaxy .avatar-picker-remove-btn,
+[data-theme="deep-galaxy"] .avatar-picker-remove-btn {
+  background-color: #FCA5A5 !important;
+  color: #7F1D1D !important;
+  border-color: #000000 !important;
+}
+.theme-deep-galaxy .avatar-picker-remove-btn:hover,
+[data-theme="deep-galaxy"] .avatar-picker-remove-btn:hover {
+  background-color: #F87171 !important;
+  color: #000000 !important;
+}
+.theme-deep-galaxy .avatar-picker-remove-btn *,
+[data-theme="deep-galaxy"] .avatar-picker-remove-btn * {
+  color: #7F1D1D !important;
+  stroke: #7F1D1D !important;
+}
+
+.theme-deep-galaxy button[class*="bg-[#FEF08A]"]:not(.sidebar-profile-btn) *,
+[data-theme="deep-galaxy"] button[class*="bg-[#FEF08A]"]:not(.sidebar-profile-btn) *,
+.theme-deep-galaxy button[class*="bg-[#FDE047]"] *,
+[data-theme="deep-galaxy"] button[class*="bg-[#FDE047]"] *,
+.theme-deep-galaxy button[class*="bg-[#4ADE80]"] *,
+[data-theme="deep-galaxy"] button[class*="bg-[#4ADE80]"] *,
+.theme-deep-galaxy button[class*="bg-[#E0F2FE]"] *,
+[data-theme="deep-galaxy"] button[class*="bg-[#E0F2FE]"] *,
+.theme-deep-galaxy span[class*="bg-[#FEF08A]"] *,
+[data-theme="deep-galaxy"] span[class*="bg-[#FEF08A]"] * {
+  color: #000000 !important;
+  stroke: #000000 !important;
+}
+
+/* 7. NESTED DARK BOXES INSIDE YELLOW HERO BANNERS (ÖRN: CÜZDAN KARTI) */
+.theme-deep-galaxy [class*="bg-[#FEF08A]"] .bg-white,
+[data-theme="deep-galaxy"] [class*="bg-[#FEF08A]"] .bg-white,
+.theme-deep-galaxy [class*="bg-[#FEF08A]"] [class*="bg-[#FFFDF5]"],
+[data-theme="deep-galaxy"] [class*="bg-[#FEF08A]"] [class*="bg-[#FFFDF5]"],
+.theme-deep-galaxy [class*="bg-[#FEF08A]"] [class*="bg-[#0B1120]"],
+[data-theme="deep-galaxy"] [class*="bg-[#FEF08A]"] [class*="bg-[#0B1120]"] {
+  background-color: #0B1120 !important;
+  color: #F8FAFC !important;
+  border-color: #334155 !important;
+}
+.theme-deep-galaxy [class*="bg-[#FEF08A]"] .bg-white [data-testid="shop-wallet-coins"],
+[data-theme="deep-galaxy"] [class*="bg-[#FEF08A]"] .bg-white [data-testid="shop-wallet-coins"] {
+  color: #F8FAFC !important;
+}
+.theme-deep-galaxy [class*="bg-[#FEF08A]"] .bg-white span.text-gray-500,
+[data-theme="deep-galaxy"] [class*="bg-[#FEF08A]"] .bg-white span.text-gray-500 {
+  color: #94A3B8 !important;
+}
+
+/* 8. İNAKTİF BEYAZ FİLTRE BUTONLARI -> KOYU ŞIK BUTONLAR */
+.theme-deep-galaxy button.bg-white,
+[data-theme="deep-galaxy"] button.bg-white {
+  background-color: #0F172A !important;
+  color: #F8FAFC !important;
+  border-color: #334155 !important;
+}
+.theme-deep-galaxy button.bg-white:hover,
+[data-theme="deep-galaxy"] button.bg-white:hover {
+  background-color: #1E1B4B !important;
+  color: #38BDF8 !important;
+  border-color: #38BDF8 !important;
+}
+
+/* 9. MAĞAZA VE KARTLARDAKİ KÜÇÜK TÜR ROZETLERİ (bg-gray-100) */
+.theme-deep-galaxy .bg-gray-100:not(button):not(a),
+[data-theme="deep-galaxy"] .bg-gray-100:not(button):not(a) {
+  background-color: #1E293B !important;
+  color: #94A3B8 !important;
+  border-color: #334155 !important;
+}
+
+/* 10. HOVER DURUMU KONTRAST KORUMASI:
+   Butonun üzerine gelindiğinde zemin açık renge dönüyorsa metin ve ikonlar KESİNLİKLE SİYAH olmalı */
+.theme-deep-galaxy [class*="hover:bg-[#FEF08A]"]:hover,
+[data-theme="deep-galaxy"] [class*="hover:bg-[#FEF08A]"]:hover,
+.theme-deep-galaxy [class*="hover:bg-[#FDE047]"]:hover,
+[data-theme="deep-galaxy"] [class*="hover:bg-[#FDE047]"]:hover,
+.theme-deep-galaxy [class*="hover:bg-[#FACC15]"]:hover,
+[data-theme="deep-galaxy"] [class*="hover:bg-[#FACC15]"]:hover {
+  color: #000000 !important;
+}
+
+.theme-deep-galaxy [class*="hover:bg-[#FEF08A]"]:hover *,
+[data-theme="deep-galaxy"] [class*="hover:bg-[#FEF08A]"]:hover *,
+.theme-deep-galaxy [class*="hover:bg-[#FDE047]"]:hover *,
+[data-theme="deep-galaxy"] [class*="hover:bg-[#FDE047]"]:hover *,
+.theme-deep-galaxy [class*="hover:bg-[#FACC15]"]:hover *,
+[data-theme="deep-galaxy"] [class*="hover:bg-[#FACC15]"]:hover * {
+  color: #000000 !important;
+  stroke: #000000 !important;
+}
+
+/* 11. SİYAH BUTONLAR VE SEKMELER -> KOZMİK İNDİGO/MOR DÖNÜŞÜMÜ */
+.theme-deep-galaxy .bg-black:not(.logo-lobby-box),
+[data-theme="deep-galaxy"] .bg-black:not(.logo-lobby-box) {
+  background-color: #1E1B4B !important;
+  color: #F8FAFC !important;
+  border-color: #38BDF8 !important;
+}
+.theme-deep-galaxy .bg-black:not(.logo-lobby-box) *:not(.keep-black),
+[data-theme="deep-galaxy"] .bg-black:not(.logo-lobby-box) *:not(.keep-black) {
+  color: #F8FAFC !important;
+}
+
+/* 12. CHAT & DM THEME CONTRAST SAFEGUARDS IN DEEP GALAXY */
+.theme-deep-galaxy [data-chat-theme="dm_theme_midnight_purple"],
+[data-theme="deep-galaxy"] [data-chat-theme="dm_theme_midnight_purple"] {
+  background-color: #0F0B1E !important;
+  color: #F8FAFC !important;
+}
+.theme-deep-galaxy [data-chat-theme="dm_theme_midnight_purple"] .partner-bubble,
+[data-theme="deep-galaxy"] [data-chat-theme="dm_theme_midnight_purple"] .partner-bubble {
+  background-color: #1E1638 !important;
+  color: #E2E8F0 !important;
+  border-color: #4C1D95 !important;
+}
+
+.theme-deep-galaxy [data-chat-theme="dm_theme_emerald_secure"],
+[data-theme="deep-galaxy"] [data-chat-theme="dm_theme_emerald_secure"] {
+  background-color: #041E15 !important;
+  color: #34D399 !important;
+}
+.theme-deep-galaxy [data-chat-theme="dm_theme_emerald_secure"] .partner-bubble,
+[data-theme="deep-galaxy"] [data-chat-theme="dm_theme_emerald_secure"] .partner-bubble {
+  background-color: #063327 !important;
+  color: #D1FAE5 !important;
+  border-color: #047857 !important;
+}
+
+.theme-deep-galaxy [data-chat-theme="dm_theme_sunset_vibes"],
+[data-theme="deep-galaxy"] [data-chat-theme="dm_theme_sunset_vibes"] {
+  background-color: #1C0F1A !important;
+  color: #FCE7F3 !important;
+}
+.theme-deep-galaxy [data-chat-theme="dm_theme_sunset_vibes"] .partner-bubble,
+[data-theme="deep-galaxy"] [data-chat-theme="dm_theme_sunset_vibes"] .partner-bubble {
+  background-color: #2D1527 !important;
+  color: #FCE7F3 !important;
+  border-color: #F472B6 !important;
+}
+
+.theme-deep-galaxy [data-chat-theme="lobby_theme_cyber_neon"],
+[data-theme="deep-galaxy"] [data-chat-theme="lobby_theme_cyber_neon"] {
+  background-color: #0B1120 !important;
+  color: #F8FAFC !important;
+}
+.theme-deep-galaxy [data-chat-theme="lobby_theme_cyber_neon"] .other-bubble,
+[data-theme="deep-galaxy"] [data-chat-theme="lobby_theme_cyber_neon"] .other-bubble {
+  background-color: #0F172A !important;
+  color: #F8FAFC !important;
+  border-color: #334155 !important;
+}
+
+.theme-deep-galaxy [data-chat-theme="lobby_theme_matrix_hacker"],
+[data-theme="deep-galaxy"] [data-chat-theme="lobby_theme_matrix_hacker"] {
+  background-color: #051509 !important;
+  color: #22C55E !important;
+}
+.theme-deep-galaxy [data-chat-theme="lobby_theme_matrix_hacker"] .other-bubble,
+[data-theme="deep-galaxy"] [data-chat-theme="lobby_theme_matrix_hacker"] .other-bubble {
+  background-color: #061B0D !important;
+  color: #86EFAC !important;
+  border-color: #15803D !important;
+}
+
+.theme-deep-galaxy [data-chat-theme="lobby_theme_retro_arcade"],
+[data-theme="deep-galaxy"] [data-chat-theme="lobby_theme_retro_arcade"] {
+  background-color: #1A1408 !important;
+  color: #FEF08A !important;
+}
+.theme-deep-galaxy [data-chat-theme="lobby_theme_retro_arcade"] .other-bubble,
+[data-theme="deep-galaxy"] [data-chat-theme="lobby_theme_retro_arcade"] .other-bubble {
+  background-color: #2D220C !important;
+  color: #FEF08A !important;
+  border-color: #EAB308 !important;
+}
+
+.theme-deep-galaxy [data-chat-theme="lobby_theme_lavender_haze"],
+[data-theme="deep-galaxy"] [data-chat-theme="lobby_theme_lavender_haze"] {
+  background-color: #140D1E !important;
+  color: #F3E8FF !important;
+}
+.theme-deep-galaxy [data-chat-theme="lobby_theme_lavender_haze"] .other-bubble,
+[data-theme="deep-galaxy"] [data-chat-theme="lobby_theme_lavender_haze"] .other-bubble {
+  background-color: #221435 !important;
+  color: #F3E8FF !important;
+  border-color: #A855F7 !important;
 }

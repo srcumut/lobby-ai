@@ -46,6 +46,7 @@ import {
   Loader2,
   Swords,
   Flag,
+  Bot,
 } from "lucide-react";
 import { ReportUserModal } from "@/components/moderation/ReportUserModal";
 
@@ -87,6 +88,29 @@ export function MemberContextMenu({
   const [muteDuration, setMuteDuration] = useState<number | null>(15);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isInitiatingChat, setIsInitiatingChat] = useState(false);
+
+  // Initiate AI Bot Chat Action
+  const handleInitiateChat = async () => {
+    setIsInitiatingChat(true);
+    try {
+      await lobbiesApi.initiateAgentChat(lobbyId, member.user_id);
+      toast.add({
+        title: "Sohbet Başlatıldı 🤖",
+        description: `${member.username} odaya bir mesaj bıraktı!`,
+        type: "success",
+      });
+      onActionSuccess?.();
+    } catch (err: any) {
+      toast.add({
+        title: "Sohbet Başlatılamadı",
+        description: err.response?.data?.error?.message || "Ajan şu an sohbet başlatamıyor.",
+        type: "error",
+      });
+    } finally {
+      setIsInitiatingChat(false);
+    }
+  };
 
   // Friend Request Action
   const handleAddFriend = async () => {
@@ -266,6 +290,22 @@ export function MemberContextMenu({
             >
               <UserPlus className="w-4 h-4 text-blue-600" />
               <span>Arkadaş Ekle</span>
+            </DropdownMenuItem>
+          )}
+
+          {/* Initiate AI Chat (Only for Bots) */}
+          {member.is_bot && (
+            <DropdownMenuItem
+              className="flex items-center gap-2 p-2 hover:bg-[#E0F4FF] cursor-pointer rounded-none font-bold text-blue-900"
+              onClick={handleInitiateChat}
+              disabled={isInitiatingChat}
+            >
+              {isInitiatingChat ? (
+                <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+              ) : (
+                <Bot className="w-4 h-4 text-blue-600" />
+              )}
+              <span>{isInitiatingChat ? "Ajan Başlatılıyor..." : "🤖 Sohbet Başlat"}</span>
             </DropdownMenuItem>
           )}
 

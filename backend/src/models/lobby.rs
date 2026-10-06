@@ -11,6 +11,12 @@ pub struct Lobby {
     pub owner_id: Uuid,
     pub visibility: String,
     pub password_hash: Option<String>,
+    #[sqlx(default)]
+    pub theme: String,
+    #[sqlx(default)]
+    pub icon: String,
+    pub announcement: Option<String>,
+    pub xp: i64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -49,4 +55,3 @@ pub struct LobbyMute {
     pub muted_at: DateTime<Utc>,
     pub muted_until: Option<DateTime<Utc>>,
 }
-

@@ -16,7 +16,7 @@ pub async fn create_user(
         r#"
         INSERT INTO users (username, email, password_hash, display_name)
         VALUES ($1, $2, $3, $4)
-        RETURNING id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, is_bot, created_at, updated_at
+        RETURNING id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, coins, is_bot, created_at, updated_at
         "#,
     )
     .bind(username)
@@ -31,7 +31,7 @@ pub async fn create_user(
 
 pub async fn find_by_email(pool: &PgPool, email: &str) -> Result<Option<User>, AppError> {
     let user = sqlx::query_as::<_, User>(
-        "SELECT id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, is_bot, created_at, updated_at FROM users WHERE email = $1",
+        "SELECT id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, coins, is_bot, created_at, updated_at FROM users WHERE email = $1",
     )
     .bind(email)
     .fetch_optional(pool)
@@ -42,7 +42,7 @@ pub async fn find_by_email(pool: &PgPool, email: &str) -> Result<Option<User>, A
 
 pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<User>, AppError> {
     let user = sqlx::query_as::<_, User>(
-        "SELECT id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, is_bot, created_at, updated_at FROM users WHERE id = $1",
+        "SELECT id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, coins, is_bot, created_at, updated_at FROM users WHERE id = $1",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -53,7 +53,7 @@ pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<User>, AppErro
 
 pub async fn find_by_username(pool: &PgPool, username: &str) -> Result<Option<User>, AppError> {
     let user = sqlx::query_as::<_, User>(
-        "SELECT id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, is_bot, created_at, updated_at FROM users WHERE username = $1",
+        "SELECT id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, coins, is_bot, created_at, updated_at FROM users WHERE username = $1",
     )
     .bind(username)
     .fetch_optional(pool)
@@ -84,7 +84,7 @@ pub async fn update_profile(
             badges = COALESCE($7, badges),
             updated_at = now() 
         WHERE id = $8
-        RETURNING id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, is_bot, created_at, updated_at
+        RETURNING id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, coins, is_bot, created_at, updated_at
         "#,
     )
     .bind(display_name)
@@ -111,7 +111,7 @@ pub async fn update_avatar(
         UPDATE users 
         SET avatar_url = $1, updated_at = now() 
         WHERE id = $2
-        RETURNING id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, is_bot, created_at, updated_at
+        RETURNING id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, coins, is_bot, created_at, updated_at
         "#,
     )
     .bind(avatar_url)
@@ -132,7 +132,7 @@ pub async fn update_banner(
         UPDATE users 
         SET banner_url = $1, updated_at = now() 
         WHERE id = $2
-        RETURNING id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, is_bot, created_at, updated_at
+        RETURNING id, username, email, password_hash, display_name, first_name, last_name, avatar_url, banner_url, bio, badges, coins, is_bot, created_at, updated_at
         "#,
     )
     .bind(banner_url)

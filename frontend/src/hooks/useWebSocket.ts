@@ -54,7 +54,9 @@ export function useWebSocket(
         wsRef.current.close();
         wsRef.current = null;
       }
-      setIsConnected(false);
+      queueMicrotask(() => {
+        setIsConnected(false);
+      });
       return;
     }
 

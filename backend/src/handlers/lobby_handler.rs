@@ -179,7 +179,10 @@ pub async fn update_lobby(
         &state.db, 
         lobby_id, 
         req.name.as_deref(), 
-        req.description.as_deref()
+        req.description.as_deref(),
+        req.theme.as_deref(),
+        req.icon.as_deref(),
+        req.announcement.as_deref(),
     ).await?;
     
     let member_count = crate::repositories::lobby_repository::get_member_count(&state.db, lobby_id).await?;
@@ -191,6 +194,10 @@ pub async fn update_lobby(
         owner_id: updated.owner_id,
         visibility: updated.visibility,
         member_count,
+        theme: updated.theme,
+        icon: updated.icon,
+        announcement: updated.announcement,
+        xp: updated.xp,
         created_at: updated.created_at,
     }))
 }

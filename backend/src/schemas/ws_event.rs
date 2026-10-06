@@ -31,6 +31,8 @@ pub struct TypingPayload {
 
 // Event type constants
 pub const EVENT_MESSAGE_CREATED: &str = "message.created";
+pub const EVENT_MESSAGE_UPDATED: &str = "message.updated";
+pub const EVENT_MESSAGE_DELETED: &str = "message.deleted";
 pub const EVENT_USER_JOINED: &str = "user.joined";
 pub const EVENT_USER_LEFT: &str = "user.left";
 pub const EVENT_MESSAGE_SEND: &str = "message.send";

@@ -23,7 +23,9 @@ export function useDirectMessages(initialFriendId?: string | null) {
   const partnerTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const activeFriendIdRef = useRef<string | null>(activeFriendId);
-  activeFriendIdRef.current = activeFriendId;
+  useEffect(() => {
+    activeFriendIdRef.current = activeFriendId;
+  }, [activeFriendId]);
 
   // Load conversations list
   const fetchConversations = useCallback(async () => {
@@ -65,13 +67,17 @@ export function useDirectMessages(initialFriendId?: string | null) {
   }, []);
 
   useEffect(() => {
-    setPartnerIsTyping(false);
-    if (partnerTypingTimeoutRef.current) clearTimeout(partnerTypingTimeoutRef.current);
     if (activeFriendId && isAuthenticated) {
       loadMessages(activeFriendId);
     } else {
       setMessages([]);
     }
+    return () => {
+      setPartnerIsTyping(false);
+      if (partnerTypingTimeoutRef.current) {
+        clearTimeout(partnerTypingTimeoutRef.current);
+      }
+    };
   }, [activeFriendId, isAuthenticated, loadMessages]);
 
   // Listen to real-time incoming DMs and typing events from global WebSocket

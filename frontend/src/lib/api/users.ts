@@ -12,7 +12,14 @@ export const usersApi = {
     return response.data;
   },
   
-  updateProfile: async (data: { display_name?: string; bio?: string; avatar_url?: string; banner_url?: string }): Promise<UserInfo> => {
+  updateProfile: async (data: { 
+    display_name?: string; 
+    first_name?: string;
+    last_name?: string;
+    bio?: string; 
+    avatar_url?: string; 
+    banner_url?: string 
+  }): Promise<UserInfo> => {
     const response = await apiClient.patch<UserInfo>(`/users/me`, data);
     return response.data;
   },

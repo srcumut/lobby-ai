@@ -10,8 +10,15 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/hooks/useAuth";
 import { apiClient } from "@/lib/api/client";
 import { SHOP_ITEMS, ShopItem } from "@/data/shopItems";
+import { 
+  getEquippedCosmetics, 
+  toggleEquippedCosmetic, 
+  CosmeticCategory,
+  EquippedCosmetics 
+} from "@/lib/cosmetics";
 import { toast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
+import { AvatarFrame } from "@/components/avatar/AvatarFrame";
 import { 
   ShoppingBag, 
   Coins, 
@@ -23,7 +30,13 @@ import {
   ArrowRight,
   ShieldCheck,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Target,
+  Palette,
+  MessageSquare,
+  Globe,
+  UserCheck,
+  Activity
 } from "lucide-react";
 import Link from "next/link";
 
@@ -37,13 +50,16 @@ export default function ShopPage() {
 
 function ShopContent() {
   const { user } = useAuth();
-  const [coins, setCoins] = useState<number>(user?.coins ?? 100);
+  const [coins, setCoins] = useState<number>(user?.coins ?? 0);
   const [inventory, setInventory] = useState<string[]>([]);
+  const [equippedItems, setEquippedItems] = useState<EquippedCosmetics>({});
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
 
-  // Fetch current user coins & inventory
+  // Fetch current user coins, inventory & equipped cosmetics
   useEffect(() => {
+    setEquippedItems(getEquippedCosmetics());
+
     async function loadData() {
       try {
         const userRes = await apiClient.get<any>("/users/me");
@@ -66,14 +82,44 @@ function ShopContent() {
         setCoins(e.detail.coins);
       }
     };
+
+    const handleCosmeticsUpdate = (e: any) => {
+      if (e.detail) {
+        setEquippedItems(e.detail);
+      }
+    };
+
     window.addEventListener("lobby:coins_updated", handleCoinUpdate);
     window.addEventListener("lobby:badge_unlocked", handleCoinUpdate);
+    window.addEventListener("lobby:cosmetics_updated", handleCosmeticsUpdate);
 
     return () => {
       window.removeEventListener("lobby:coins_updated", handleCoinUpdate);
       window.removeEventListener("lobby:badge_unlocked", handleCoinUpdate);
+      window.removeEventListener("lobby:cosmetics_updated", handleCosmeticsUpdate);
     };
   }, []);
+
+  const toggleEquip = (item: ShopItem) => {
+    const { equipped, cosmetics } = toggleEquippedCosmetic(
+      item.type as CosmeticCategory,
+      item.id
+    );
+    setEquippedItems(cosmetics);
+    if (equipped) {
+      toast.add({
+        title: "Kuşanıldı! ✨",
+        description: `${item.name} başarıyla profilinize/sohbetinize uygulandı.`,
+        type: "success",
+      });
+    } else {
+      toast.add({
+        title: "Kuşanma Kaldırıldı",
+        description: `${item.name} aktif kozmetiklerinizden çıkarıldı.`,
+        type: "info",
+      });
+    }
+  };
 
   const filteredItems = SHOP_ITEMS.filter((item) => {
     if (selectedFilter === "all") return true;
@@ -84,7 +130,7 @@ function ShopContent() {
     if (coins < item.price) {
       toast.add({
         title: "Yetersiz Bakiye!",
-        description: `Bu eşya için ${item.price} 🪙 gerekiyor. Mevcut bakiyen: ${coins} 🪙. Günlük görevlerden coin kazanabilirsin!`,
+        description: `Bu eşya için ${item.price} 🪙 gerekiyor. Mevcut bakiyen: ${coins} 🪙. Günlük ve haftalık görevlerden coin toplayabilirsin!`,
         type: "error",
       });
       return;
@@ -100,6 +146,15 @@ function ShopContent() {
 
       setCoins(res.data.coins);
       setInventory((prev) => [...prev, item.id]);
+
+      // Trigger global event so TopBar, QuestsModal, and useAuth get the updated coin count immediately
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("lobby:coins_updated", {
+            detail: { coins: res.data.coins },
+          })
+        );
+      }
 
       // If it's a badge, also trigger unlock
       if (item.type === "badge") {
@@ -141,7 +196,7 @@ function ShopContent() {
           </div>
 
           {/* Wallet Card */}
-          <div className="bg-white border-4 border-black p-4 brutal-shadow flex items-center gap-4 shrink-0">
+          <div className="bg-white border-4 border-black p-4 brutal-shadow flex items-center gap-4 shrink-0 flex-wrap sm:flex-nowrap">
             <div className="w-12 h-12 bg-[#FEF08A] border-2 border-black flex items-center justify-center text-2xl shadow-[2px_2px_0_0_#000]">
               🪙
             </div>
@@ -150,21 +205,35 @@ function ShopContent() {
                 Cüzdan Bakiyesi
               </span>
               <div className="flex items-center gap-1.5">
-                <span className="text-2xl md:text-3xl font-black text-black">
+                <span data-testid="shop-wallet-coins" className="text-2xl md:text-3xl font-black text-black">
                   {coins.toLocaleString()}
                 </span>
                 <span className="font-black text-sm text-yellow-600 uppercase">Coin</span>
               </div>
             </div>
-            <Link href="/community">
+            <div className="flex items-center gap-2 ml-auto sm:ml-2">
               <Button
                 variant="outline"
                 size="sm"
-                className="ml-2 border-2 border-black bg-[#E0F2FE] hover:bg-[#bae6fd] font-black text-xs text-black shadow-[2px_2px_0_0_#000]"
+                onClick={() => window.dispatchEvent(new CustomEvent("lobby:open_quests"))}
+                data-testid="shop-open-quests-button"
+                className="border-2 border-black bg-[#E0F2FE] hover:bg-[#bae6fd] font-black text-xs text-black shadow-[2px_2px_0_0_#000] cursor-pointer"
               >
-                Görevler <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                <Target className="w-3.5 h-3.5 mr-1" />
+                Görevler
               </Button>
-            </Link>
+              <Link href="/profile?tab=inventory">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid="shop-open-inventory-button"
+                  className="border-2 border-black bg-[#FEF08A] hover:bg-[#FDE047] font-black text-xs text-black shadow-[2px_2px_0_0_#000] cursor-pointer"
+                >
+                  <UserCheck className="w-3.5 h-3.5 mr-1" />
+                  Envanterim
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -173,9 +242,12 @@ function ShopContent() {
       <div className="flex flex-wrap items-center gap-2 border-b-4 border-black pb-4">
         {[
           { id: "all", label: "Tüm Eşyalar", icon: Sparkles },
+          { id: "global_theme", label: "Genel Galaksi Teması", icon: Globe },
           { id: "border", label: "Avatar Çerçeveleri", icon: ShieldCheck },
+          { id: "avatar_animation", label: "Avatar Animasyonları", icon: Activity },
+          { id: "lobby_theme", label: "Lobi Sohbet Temaları", icon: MessageSquare },
+          { id: "dm_theme", label: "Özel Mesaj (DM) Temaları", icon: Palette },
           { id: "title", label: "Özel Ünvanlar", icon: Tag },
-          { id: "theme", label: "Sohbet Temaları", icon: ShoppingBag },
           { id: "badge", label: "Nadir Rozetler", icon: Coins },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -184,7 +256,7 @@ function ShopContent() {
             <button
               key={tab.id}
               onClick={() => setSelectedFilter(tab.id)}
-              className={`px-4 py-2 border-2 border-black font-black text-xs md:text-sm flex items-center gap-2 transition-all cursor-pointer ${
+              className={`px-3.5 py-2 border-2 border-black font-black text-xs md:text-sm flex items-center gap-1.5 transition-all cursor-pointer ${
                 isActive
                   ? "bg-black text-white brutal-shadow -translate-y-0.5"
                   : "bg-white text-black hover:bg-[#FAF8F0] shadow-[2px_2px_0_0_#000]"
@@ -203,6 +275,7 @@ function ShopContent() {
           const isOwned = inventory.includes(item.id);
           const canAfford = coins >= item.price;
           const isBusy = purchasingId === item.id;
+          const isEquipped = equippedItems[item.type as keyof EquippedCosmetics] === item.id;
 
           return (
             <div
@@ -225,10 +298,16 @@ function ShopContent() {
                   <span className="text-xs font-black px-2 py-0.5 bg-gray-100 border border-black uppercase">
                     {item.type === "border"
                       ? "Çerçeve"
+                      : item.type === "avatar_animation"
+                      ? "Animasyon"
                       : item.type === "title"
                       ? "Ünvan"
-                      : item.type === "theme"
-                      ? "Tema"
+                      : item.type === "global_theme"
+                      ? "Genel Tema"
+                      : item.type === "lobby_theme"
+                      ? "Lobi Teması"
+                      : item.type === "dm_theme"
+                      ? "DM Teması"
                       : "Rozet"}
                   </span>
                 </div>
@@ -242,8 +321,28 @@ function ShopContent() {
                   </p>
                 </div>
 
-                {/* Optional visual preview box */}
-                {item.previewClass && (
+                {/* Live Visual Preview Box */}
+                {item.type === "border" && (
+                  <div className="p-4 bg-[#FAF8F0] border-2 border-dashed border-gray-300 rounded flex items-center justify-center overflow-visible">
+                    <AvatarFrame borderId={item.id} size="md">
+                      <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-cyan-500 to-indigo-500 border-2 border-black flex items-center justify-center text-xl text-white font-black shadow-[2px_2px_0_0_#000]">
+                        🤖
+                      </div>
+                    </AvatarFrame>
+                  </div>
+                )}
+
+                {item.type === "avatar_animation" && (
+                  <div className="p-4 bg-[#FAF8F0] border-2 border-dashed border-gray-300 rounded flex items-center justify-center overflow-visible">
+                    <AvatarFrame animationId={item.id} size="md">
+                      <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-amber-400 to-rose-500 border-2 border-black flex items-center justify-center text-xl text-white font-black shadow-[2px_2px_0_0_#000]">
+                        ⚡
+                      </div>
+                    </AvatarFrame>
+                  </div>
+                )}
+
+                {item.type !== "border" && item.type !== "avatar_animation" && item.previewClass && (
                   <div className="p-3 bg-[#FAF8F0] border-2 border-dashed border-gray-300 rounded flex items-center justify-center">
                     <div className={`px-4 py-1.5 text-xs font-black ${item.previewClass}`}>
                       Önizleme
@@ -260,9 +359,25 @@ function ShopContent() {
                 </div>
 
                 {isOwned ? (
-                  <div className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#DCFCE7] border-2 border-black text-green-900 font-black text-xs shadow-[2px_2px_0_0_#000]">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    Sahipsin
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                    <div className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#DCFCE7] border-2 border-black text-green-900 font-black text-xs shadow-[1.5px_1.5px_0_0_#000]">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Sahipsin
+                    </div>
+                    {item.type !== "badge" && (
+                      <Button
+                        size="sm"
+                        onClick={() => toggleEquip(item)}
+                        data-testid={`equip-btn-${item.id}`}
+                        className={`font-black text-xs border-2 border-black shadow-[2px_2px_0_0_#000] cursor-pointer py-1 px-2.5 ${
+                          isEquipped
+                            ? "bg-[#A78BFA] hover:bg-[#8B5CF6] text-black"
+                            : "bg-[#FEF08A] hover:bg-[#FDE047] text-black"
+                        }`}
+                      >
+                        {isEquipped ? "Kuşanıldı ✓" : "Kuşan"}
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <Button

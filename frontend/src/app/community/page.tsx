@@ -13,8 +13,8 @@ import { lobbiesApi } from "@/lib/api/lobbies";
 import { Lobby } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { toast } from "@/components/ui/toast";
-import { playBlipSound, playPointSound, playWinSound } from "@/lib/arcadeSounds";
 import { 
   Sparkles, 
   Crown, 
@@ -37,11 +37,21 @@ import {
   Star,
   Activity,
   Layers,
-  Coins
+  Coins,
+  Target
 } from "lucide-react";
 import { NewsSlider } from "@/components/community/NewsSlider";
 import { getDailyPoll } from "@/data/polls";
-import { DAILY_QUESTS, DailyQuest } from "@/data/dailyQuests";
+import { 
+  DAILY_QUESTS, 
+  DailyQuest, 
+  getClaimedQuests, 
+  claimQuestReward,
+  getQuestProgress,
+  isQuestCompleted,
+  canClaimReward,
+  trackQuestAction 
+} from "@/data/dailyQuests";
 import { awardCoins, unlockBadge } from "@/lib/badgeManager";
 
 interface PollOption {
@@ -66,22 +76,36 @@ export default function CommunityPage() {
   );
   const [userVotedId, setUserVotedId] = useState<number | null>(null);
 
-  // Daily Quests with coin rewards
+  // Daily Quests with coin rewards (synchronized with QuestsModal)
   const [completedQuestIds, setCompletedQuestIds] = useState<string[]>([]);
+  const [questTick, setQuestTick] = useState<number>(0);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("lobby-ai:completed-quests");
-      if (saved) setCompletedQuestIds(JSON.parse(saved));
-    } catch {}
+    setCompletedQuestIds(getClaimedQuests("daily"));
+
+    const handleQuestClaimed = () => {
+      setCompletedQuestIds(getClaimedQuests("daily"));
+      setQuestTick((t) => t + 1);
+    };
+
+    const handleQuestProgress = () => {
+      setQuestTick((t) => t + 1);
+    };
+
+    window.addEventListener("lobby:quest_claimed", handleQuestClaimed);
+    window.addEventListener("lobby:quest_progress_updated", handleQuestProgress);
+    return () => {
+      window.removeEventListener("lobby:quest_claimed", handleQuestClaimed);
+      window.removeEventListener("lobby:quest_progress_updated", handleQuestProgress);
+    };
   }, []);
 
   const handleClaimQuest = async (quest: DailyQuest) => {
     if (completedQuestIds.includes(quest.id)) return;
-    await awardCoins(quest.rewardCoins, `Görev Tamamlandı: ${quest.title}`);
-    const next = [...completedQuestIds, quest.id];
-    setCompletedQuestIds(next);
-    localStorage.setItem("lobby-ai:completed-quests", JSON.stringify(next));
+    if (!canClaimReward(quest)) return;
+    await claimQuestReward(quest);
+    setCompletedQuestIds(getClaimedQuests("daily"));
+    setQuestTick((t) => t + 1);
   };
 
   // Load saved votes from localStorage
@@ -124,7 +148,6 @@ export default function CommunityPage() {
       return;
     }
 
-    playPointSound();
     setPollOptions(prev =>
       prev.map(opt => (opt.id === optionId ? { ...opt, votes: opt.votes + 1 } : opt))
     );
@@ -137,6 +160,7 @@ export default function CommunityPage() {
 
     await awardCoins(35, "Günün anketine oy kullandınız!");
     await unlockBadge("poll_voter");
+    trackQuestAction("poll_voted");
 
     toast.add({
       title: "Oyunuz Kaydedildi! 🎉",
@@ -147,7 +171,6 @@ export default function CommunityPage() {
 
   // Quick Match / Teleport logic
   const handleQuickMatch = (category?: string) => {
-    playWinSound();
     if (lobbies.length === 0) {
       toast.add({
         title: "Aktif Lobi Bulunamadı",
@@ -202,7 +225,8 @@ export default function CommunityPage() {
   }, [lobbies, searchQuery, selectedCategory]);
 
   return (
-    <div className="flex-1 w-full max-w-6xl mx-auto space-y-8 flex flex-col pt-2 pb-16 animate-fade-in">
+    <ProtectedRoute>
+      <div className="flex-1 w-full max-w-6xl mx-auto space-y-8 flex flex-col pt-2 pb-16 animate-fade-in">
       
       {/* 1. COMPLETELY REDESIGNED FIRST BLOCK: Community Bulletin & Live Dispatch Station */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -254,7 +278,6 @@ export default function CommunityPage() {
                   <button
                     key={cat.id}
                     onClick={() => {
-                      playBlipSound();
                       setSelectedCategory(cat.id);
                     }}
                     className={`
@@ -525,25 +548,50 @@ export default function CommunityPage() {
             <div className="space-y-2.5 pt-1">
               {DAILY_QUESTS.map((quest) => {
                 const isClaimed = completedQuestIds.includes(quest.id);
+                const progress = getQuestProgress(quest.id, quest.frequency);
+                const isComplete = isQuestCompleted(quest);
+                const canClaim = isComplete && !isClaimed;
+                const progressRatio = Math.min(quest.targetCount, progress);
+                const percent = Math.min(100, Math.round((progressRatio / quest.targetCount) * 100));
+
                 return (
                   <div
                     key={quest.id}
                     className={`
                       p-3 border-2 border-black rounded-sm flex items-center justify-between gap-3 text-xs transition-all
-                      ${isClaimed ? "bg-[#4ADE80]/20 border-emerald-800" : "bg-white shadow-[2px_2px_0_0_rgba(0,0,0,1)]"}
+                      ${isClaimed ? "bg-[#4ADE80]/20 border-emerald-800" : isComplete ? "bg-[#FEF9C3]/50 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)]" : "bg-white shadow-[2px_2px_0_0_rgba(0,0,0,1)]"}
                     `}
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-base shrink-0">
+                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                      <span className="text-base shrink-0 mt-0.5">
                         {isClaimed ? "✅" : quest.icon}
                       </span>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="font-black text-black truncate leading-tight">
                           {quest.title}
                         </p>
-                        <span className="text-[10px] font-bold text-gray-500">
-                          Ödül: +{quest.rewardCoins} 🪙 ({quest.description})
+                        <span className="text-[10px] font-bold text-gray-500 block leading-snug">
+                          +{quest.rewardCoins} 🪙 • {quest.description}
                         </span>
+
+                        {/* Progress Bar */}
+                        <div className="pt-1.5 flex items-center gap-2">
+                          <div className="w-20 sm:w-28 h-2 bg-gray-200 border border-black overflow-hidden relative">
+                            <div
+                              className={`h-full transition-all duration-300 ${
+                                isClaimed
+                                  ? "bg-[#4ADE80]"
+                                  : isComplete
+                                  ? "bg-[#22C55E]"
+                                  : "bg-[#3B82F6]"
+                              }`}
+                              style={{ width: `${percent}%` }}
+                            />
+                          </div>
+                          <span className="text-[9px] font-mono font-bold text-gray-700">
+                            {progressRatio}/{quest.targetCount}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
@@ -551,12 +599,20 @@ export default function CommunityPage() {
                       <span className="px-2 py-0.5 text-[9px] font-black uppercase border border-black bg-[#DCFCE7] text-green-900 shrink-0">
                         Alındı
                       </span>
-                    ) : (
+                    ) : canClaim ? (
                       <button
                         onClick={() => handleClaimQuest(quest)}
-                        className="px-2 py-1 text-[9px] font-black uppercase border-2 border-black bg-[#FEF08A] hover:bg-[#FDE047] text-black shrink-0 shadow-[1px_1px_0_0_#000] active:translate-y-px cursor-pointer"
+                        className="px-2.5 py-1 text-[9px] font-black uppercase border-2 border-black bg-[#4ADE80] hover:bg-[#22c55e] text-black shrink-0 shadow-[1px_1px_0_0_#000] active:translate-y-px cursor-pointer animate-pulse"
                       >
-                        Tamamla
+                        Ödülü Al 🎁
+                      </button>
+                    ) : (
+                      <button
+                        disabled
+                        className="px-2 py-1 text-[9px] font-bold uppercase border border-gray-300 bg-gray-100 text-gray-400 shrink-0 cursor-not-allowed opacity-80"
+                        title={`İlerleme: ${progressRatio}/${quest.targetCount}`}
+                      >
+                        {progressRatio}/{quest.targetCount}
                       </button>
                     )}
                   </div>
@@ -564,12 +620,21 @@ export default function CommunityPage() {
               })}
             </div>
 
-            {/* Profile Badges Quick Link */}
-            <div className="pt-2">
+            {/* Quests Modal & Profile Badges Quick Links */}
+            <div className="pt-2 space-y-2">
+              <Button 
+                size="sm" 
+                onClick={() => window.dispatchEvent(new CustomEvent("lobby:open_quests"))}
+                className="w-full bg-[#4ADE80] hover:bg-[#22c55e] text-black font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:-translate-y-px transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Target className="w-3.5 h-3.5 text-black" />
+                Tüm Görevleri Aç (Haftalık & Günlük)
+              </Button>
+
               <Link href="/profile" className="block">
                 <Button 
                   size="sm" 
-                  className="w-full bg-[#FEF08A] hover:bg-[#FDE047] text-black font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:-translate-y-px transition-all flex items-center justify-center gap-1.5"
+                  className="w-full bg-[#FEF08A] hover:bg-[#FDE047] text-black font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:-translate-y-px transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Trophy className="w-3.5 h-3.5 text-black" />
                   Rozet Koleksiyonuma Git
@@ -609,5 +674,6 @@ export default function CommunityPage() {
       </div>
 
     </div>
+    </ProtectedRoute>
   );
 }

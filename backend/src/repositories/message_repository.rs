@@ -84,3 +84,42 @@ pub async fn get_message(
 
     Ok(message)
 }
+
+pub async fn update_message(
+    pool: &PgPool,
+    message_id: Uuid,
+    content: &str,
+) -> Result<Option<Message>, AppError> {
+    let message = sqlx::query_as::<_, Message>(
+        r#"
+        UPDATE messages
+        SET content = $1, updated_at = now()
+        WHERE id = $2 AND deleted_at IS NULL
+        RETURNING id, lobby_id, sender_id, content, created_at, updated_at, deleted_at
+        "#,
+    )
+    .bind(content)
+    .bind(message_id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(message)
+}
+
+pub async fn soft_delete_message(
+    pool: &PgPool,
+    message_id: Uuid,
+) -> Result<bool, AppError> {
+    let result = sqlx::query(
+        r#"
+        UPDATE messages
+        SET deleted_at = now()
+        WHERE id = $1 AND deleted_at IS NULL
+        "#,
+    )
+    .bind(message_id)
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected() > 0)
+}

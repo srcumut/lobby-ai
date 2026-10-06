@@ -10,7 +10,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Swords, RotateCcw, Trophy, Bot, Flame, Sparkles } from "lucide-react";
-import { playBlipSound, playPointSound, playHitSound, playWinSound } from "@/lib/arcadeSounds";
 
 export type RpsChoice = "rock" | "paper" | "scissors";
 
@@ -117,7 +116,6 @@ export function LobbyRpsDuel({
     if (action.gameType === "rps") {
       if (action.type === "choice_ready" && action.senderId === opponentId) {
         setOpponentReady(true);
-        playBlipSound();
       } else if (action.type === "reveal" && action.senderId === opponentId) {
         setOpponentChoice(action.choice);
       } else if (action.type === "rematch") {
@@ -130,7 +128,6 @@ export function LobbyRpsDuel({
   const handleSelectChoice = (choice: RpsChoice) => {
     if (myChoice || isRevealed) return;
     setMyChoice(choice);
-    playBlipSound();
 
     if (opponentIsBot) {
       // Bot picks randomly
@@ -166,13 +163,11 @@ export function LobbyRpsDuel({
   const startCountdown = () => {
     setCountdown(3);
     let count = 3;
-    playPointSound();
 
     countdownIntervalRef.current = setInterval(() => {
       count--;
       if (count > 0) {
         setCountdown(count);
-        playPointSound();
       } else {
         if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
         setCountdown(null);
@@ -184,13 +179,11 @@ export function LobbyRpsDuel({
   const startReveal = (myPick: RpsChoice, oppPick: RpsChoice) => {
     setCountdown(3);
     let count = 3;
-    playPointSound();
 
     countdownIntervalRef.current = setInterval(() => {
       count--;
       if (count > 0) {
         setCountdown(count);
-        playPointSound();
       } else {
         if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
         setCountdown(null);
@@ -214,17 +207,14 @@ export function LobbyRpsDuel({
 
     if (p1 === p2) {
       outcome = "tie";
-      playHitSound();
     } else if (
       (p1 === "rock" && p2 === "scissors") ||
       (p1 === "paper" && p2 === "rock") ||
       (p1 === "scissors" && p2 === "paper")
     ) {
       outcome = "me";
-      playWinSound();
     } else {
       outcome = "opponent";
-      playHitSound();
     }
 
     setWinner(outcome);
@@ -259,7 +249,6 @@ export function LobbyRpsDuel({
 
   const handleRematch = () => {
     resetRound();
-    playBlipSound();
     if (!opponentIsBot) {
       sendGameAction({
         gameType: "rps",

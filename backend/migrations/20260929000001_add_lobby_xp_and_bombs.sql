@@ -1,0 +1,9 @@
+ALTER TABLE lobbies ADD COLUMN xp BIGINT NOT NULL DEFAULT 0 CHECK (xp >= 0);
+
+CREATE TABLE lobby_bomb_games (
+    lobby_id UUID PRIMARY KEY REFERENCES lobbies(id) ON DELETE CASCADE,
+    target SMALLINT NOT NULL CHECK (target BETWEEN 1 AND 100),
+    lower_bound SMALLINT NOT NULL DEFAULT 1,
+    upper_bound SMALLINT NOT NULL DEFAULT 100,
+    expires_at TIMESTAMPTZ NOT NULL
+);

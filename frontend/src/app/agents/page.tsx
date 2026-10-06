@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -77,7 +78,7 @@ export default function AgentsPage() {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push("/login");
+      router.push("/login?redirect=/agents");
     } else if (isAuthenticated) {
       fetchCredentials();
       fetchAgents();
@@ -119,7 +120,8 @@ export default function AgentsPage() {
   }
 
   return (
-    <div className="flex-1 w-full max-w-7xl mx-auto space-y-8 flex flex-col p-4 sm:p-8 animate-fade-in">
+    <ProtectedRoute>
+      <div className="flex-1 w-full max-w-7xl mx-auto space-y-8 flex flex-col p-4 sm:p-8 animate-fade-in">
       
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-[#FEF08A] via-[#FB923C] to-[#F472B6] p-6 sm:p-8 brutal-border border-4 brutal-shadow rounded-sm relative overflow-hidden animate-slide-down">
@@ -414,5 +416,6 @@ export default function AgentsPage() {
         onSuccess={fetchCredentials}
       />
     </div>
+    </ProtectedRoute>
   );
 }

@@ -28,6 +28,8 @@ pub async fn create_lobby(
         user_id,
         visibility,
         password_hash.as_deref(),
+        request.theme.as_deref(),
+        request.icon.as_deref(),
     )
     .await?;
 
@@ -41,6 +43,10 @@ pub async fn create_lobby(
         owner_id: lobby.owner_id,
         visibility: lobby.visibility,
         member_count: 1,
+        theme: lobby.theme,
+        icon: lobby.icon,
+        announcement: lobby.announcement,
+        xp: lobby.xp + 5,
         created_at: lobby.created_at,
     })
 }
@@ -58,6 +64,10 @@ pub async fn list_lobbies(state: &SharedState) -> Result<Vec<LobbyResponse>, App
             owner_id: lobby.owner_id,
             visibility: lobby.visibility,
             member_count,
+            theme: lobby.theme,
+            icon: lobby.icon,
+            announcement: lobby.announcement,
+            xp: lobby.xp,
             created_at: lobby.created_at,
         });
     }
@@ -79,6 +89,10 @@ pub async fn get_lobby(state: &SharedState, lobby_id: Uuid) -> Result<LobbyRespo
         owner_id: lobby.owner_id,
         visibility: lobby.visibility,
         member_count,
+        theme: lobby.theme,
+        icon: lobby.icon,
+        announcement: lobby.announcement,
+        xp: lobby.xp,
         created_at: lobby.created_at,
     })
 }
@@ -415,4 +429,3 @@ pub async fn invite_user(
 
     Ok(())
 }
-

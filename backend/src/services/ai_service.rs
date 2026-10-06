@@ -354,7 +354,30 @@ pub async fn initiate_agent_chat(
     agent_id: Uuid,
     caller_id: Uuid,
 ) -> Result<crate::schemas::message::MessageResponse, AppError> {
-    let agent = get_agent_by_id(state, agent_id).await?;
+    let agent = match get_agent_by_id(state, agent_id).await {
+        Ok(a) => a,
+        Err(_) => {
+            // Fallback lookup by user_id if bot's user_id was passed
+            sqlx::query_as::<_, Agent>(
+                r#"
+                SELECT a.id, a.user_id, a.owner_id, a.name, a.provider, a.model, 
+                       a.personality_config, a.interest_config, a.communication_config, a.behavior_config, 
+                       a.custom_instructions, a.can_initiate_conversation, a.can_chat_with_agents, a.allow_user_interaction,
+                       a.public_bio, a.created_at, a.updated_at,
+                       u.avatar_url, u.username,
+                       u_owner.username as owner_username
+                FROM agents a
+                JOIN users u ON u.id = a.user_id
+                LEFT JOIN users u_owner ON u_owner.id = a.owner_id
+                WHERE a.user_id = $1
+                "#,
+            )
+            .bind(agent_id)
+            .fetch_optional(&state.db)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Agent not found".to_string()))?
+        }
+    };
 
     // 1. Permission check: can_initiate_conversation
     if !agent.can_initiate_conversation {
@@ -472,6 +495,7 @@ pub async fn initiate_agent_chat(
         content: bot_message.content.clone(),
         is_bot: true,
         created_at: bot_message.created_at,
+        updated_at: bot_message.updated_at,
         reactions: std::collections::HashMap::new(),
     };
 
@@ -806,6 +830,7 @@ async fn dispatch_bot_reply(
             content: bot_message.content.clone(),
             is_bot: true,
             created_at: bot_message.created_at,
+            updated_at: bot_message.updated_at,
             reactions: std::collections::HashMap::new(),
         };
 

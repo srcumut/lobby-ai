@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { MoreVertical, MicOff, Mic, UserMinus, Ban, UserCheck, UserPlus, Check, X, Loader2, Send, Mail, Shield } from "lucide-react";
+import { MoreVertical, MicOff, Mic, UserMinus, Ban, UserCheck, UserPlus, Check, X, Loader2, Send, Mail, Shield, Palette, Sparkles } from "lucide-react";
 import { lobbiesApi } from "@/lib/api/lobbies";
 import { aiApi } from "@/lib/api/ai";
 import { friendsApi } from "@/lib/api/friends";
@@ -13,6 +13,8 @@ import { toast } from "@/components/ui/toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queryKeys";
 import { LobbyMember, BannedUser, Lobby, Agent, JoinRequest, UserInfo } from "@/types";
+import { LOBBY_THEMES, LOBBY_ICONS, getLobbyTheme } from "@/lib/lobbyThemes";
+import { getEquippedCosmetics, setEquippedCosmetic } from "@/lib/cosmetics";
 
 interface LobbySettingsDialogProps {
   lobby: Lobby | null;
@@ -38,14 +40,40 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
   const [loadingBots, setLoadingBots] = useState(false);
   const [addingBot, setAddingBot] = useState<string | null>(null);
 
-  // Settings tab form state
+  // Settings & Customization tab form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [theme, setTheme] = useState("cyber-cyan");
+  const [icon, setIcon] = useState("💬");
+  const [announcement, setAnnouncement] = useState("");
   const [updatingSettings, setUpdatingSettings] = useState(false);
 
   // Notification preference state
   const [notificationPreference, setNotificationPreference] = useState<"ALL" | "MENTIONS_ONLY" | "MUTE">("MENTIONS_ONLY");
   const [updatingNotification, setUpdatingNotification] = useState(false);
+
+  // Personal Lobby Chat Theme state
+  const [equippedLobbyTheme, setEquippedLobbyTheme] = useState<string | null>(null);
+
+  useEffect(() => {
+    const cosmetics = getEquippedCosmetics();
+    setEquippedLobbyTheme(cosmetics.lobby_theme || null);
+    const handleUpdate = (e: any) => {
+      setEquippedLobbyTheme(e.detail?.lobby_theme || null);
+    };
+    window.addEventListener("lobby:cosmetics_updated", handleUpdate);
+    return () => window.removeEventListener("lobby:cosmetics_updated", handleUpdate);
+  }, []);
+
+  const handleSelectPersonalLobbyTheme = (themeId: string | null) => {
+    setEquippedCosmetic("lobby_theme", themeId);
+    setEquippedLobbyTheme(themeId);
+    toast.add({
+      title: "Lobi Teması Güncellendi ✨",
+      description: "Mesaj baloncuklarınız seçtiğiniz temaya uyarlandı.",
+      type: "success",
+    });
+  };
 
   // Join Requests state
   const [requests, setRequests] = useState<JoinRequest[]>([]);
@@ -146,6 +174,9 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
     if (isOpen && lobby) {
       setName(lobby.name);
       setDescription(lobby.description || "");
+      setTheme(lobby.theme || "cyber-cyan");
+      setIcon(lobby.icon || "💬");
+      setAnnouncement(lobby.announcement || "");
       fetchMembers();
       if (myRole === 'OWNER' || myRole === 'MODERATOR') {
         fetchBans();
@@ -318,13 +349,19 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
     if (!lobby) return;
     setUpdatingSettings(true);
     try {
-      const updated = await lobbiesApi.updateLobby(lobby.id, name, description);
+      const updated = await lobbiesApi.updateLobby(lobby.id, {
+        name,
+        description,
+        theme,
+        icon,
+        announcement,
+      });
       queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.detail(lobby.id) });
       queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.all });
       onLobbyUpdated(updated);
       toast.add({
         title: "Lobi Güncellendi",
-        description: "Lobi ayarları başarıyla kaydedildi.",
+        description: "Lobi ayarları ve görsel teması başarıyla kaydedildi.",
         type: "success",
       });
     } catch (e: any) {
@@ -394,7 +431,7 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="brutal-border shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] bg-yellow-50 w-[95vw] max-w-2xl h-[720px] max-h-[90vh] flex flex-col overflow-hidden">
+      <DialogContent className="brutal-border shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] bg-yellow-50 w-[95vw] sm:max-w-3xl md:max-w-4xl lg:max-w-5xl h-[720px] max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="text-2xl font-black">Lobi Ayarları</DialogTitle>
         </DialogHeader>
@@ -441,6 +478,10 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
                 Ayarlar
               </TabsTrigger>
             )}
+            <TabsTrigger value="themes" data-testid="lobby-theme-tab-trigger" className="h-auto shrink-0 flex-none whitespace-nowrap font-black text-xs uppercase px-3.5 py-2 border-2 border-transparent data-[state=active]:border-black data-[state=active]:bg-[#FEF08A] data-[state=active]:shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:bg-gray-100 cursor-pointer transition-all rounded-sm flex items-center gap-1.5">
+              <Palette className="w-3.5 h-3.5" />
+              <span>Görünüm & Tema</span>
+            </TabsTrigger>
             <TabsTrigger value="notifications" className="h-auto shrink-0 flex-none whitespace-nowrap font-black text-xs uppercase px-3.5 py-2 border-2 border-transparent data-[state=active]:border-black data-[state=active]:bg-[#FEF08A] data-[state=active]:shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:bg-gray-100 cursor-pointer transition-all rounded-sm">
               Bildirimler
             </TabsTrigger>
@@ -775,36 +816,315 @@ export function LobbySettingsDialog({ lobby, isOpen, onClose, myRole, currentUse
 
           {myRole === 'OWNER' && (
             <TabsContent value="settings" className="flex-1 overflow-y-auto">
-              <div className="space-y-4 bg-white p-4 brutal-border">
-                <div>
-                  <label className="block font-black mb-1">Lobi Adı</label>
+              <div className="space-y-5 bg-white p-5 brutal-border">
+                {/* Section 1: Basic Info */}
+                <div className="space-y-3 pb-3 border-b-2 border-black/20">
+                  <h4 className="font-black text-sm uppercase text-black flex items-center gap-1.5">
+                    <span>📌</span> Temel Oda Bilgileri
+                  </h4>
+                  <div>
+                    <label className="block font-black text-xs uppercase mb-1">Lobi Adı</label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      autoComplete="off"
+                      className="w-full border-2 border-black p-2.5 font-bold text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#06B6D4]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-black text-xs uppercase mb-1">Açıklama</label>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      autoComplete="off"
+                      rows={2}
+                      className="w-full border-2 border-black p-2.5 font-bold text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#06B6D4]"
+                    />
+                  </div>
+                </div>
+
+                {/* Section 2: Lobby Icon */}
+                <div className="space-y-2 pb-3 border-b-2 border-black/20">
+                  <label className="block font-black text-xs uppercase text-black">
+                    Oda Simgesi / Emojisi
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {LOBBY_ICONS.map((em) => (
+                      <button
+                        key={em}
+                        type="button"
+                        onClick={() => setIcon(em)}
+                        className={`w-10 h-10 border-2 border-black flex items-center justify-center text-xl transition-all cursor-pointer rounded-xs ${
+                          icon === em
+                            ? "bg-[#FEF08A] shadow-[3px_3px_0_0_#000] -translate-y-0.5 scale-105"
+                            : "bg-gray-50 hover:bg-gray-100 shadow-[1px_1px_0_0_#000]"
+                        }`}
+                        title={em}
+                      >
+                        {em}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Section 3: Lobby Theme */}
+                <div className="space-y-2 pb-3 border-b-2 border-black/20">
+                  <div className="flex items-center justify-between">
+                    <label className="block font-black text-xs uppercase text-black flex items-center gap-1.5">
+                      <Palette className="w-3.5 h-3.5 text-[#06B6D4]" /> Lobi Teması & Renk Paleti
+                    </label>
+                    <span className="text-[10px] font-mono font-bold text-gray-500 uppercase">
+                      Seçilen: {getLobbyTheme(theme).name}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                    {LOBBY_THEMES.map((th) => {
+                      const isSelected = theme === th.id;
+                      return (
+                        <div
+                          key={th.id}
+                          onClick={() => setTheme(th.id)}
+                          className={`p-3 border-2 border-black rounded-xs cursor-pointer transition-all ${
+                            isSelected
+                              ? "bg-white shadow-[4px_4px_0_0_#000] -translate-y-0.5 ring-2 ring-[#0891B2]"
+                              : "bg-gray-50/70 hover:bg-white shadow-[2px_2px_0_0_#000]"
+                          }`}
+                        >
+                          <div className={`h-6 w-full border border-black mb-2 rounded-xs ${th.headerGradient}`} />
+                          <div className="flex items-center justify-between">
+                            <span className="font-black text-xs text-black">{th.name}</span>
+                            {isSelected && <span className="text-xs">✓</span>}
+                          </div>
+                          <p className="text-[10px] font-medium text-gray-600 line-clamp-1 mt-0.5">
+                            {th.description}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Section 4: Pinned Notice / Announcement */}
+                <div className="space-y-2 pb-3 border-b-2 border-black/20">
+                  <label className="block font-black text-xs uppercase text-black flex items-center gap-1.5">
+                    <span>📢</span> Sabit Karşılama Duyurusu (Pinned Notice)
+                  </label>
                   <input
                     type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    autoComplete="off"
-                    className="w-full border-2 border-black p-2 font-bold focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    value={announcement}
+                    onChange={(e) => setAnnouncement(e.target.value)}
+                    placeholder="Örn: Hoş geldiniz! Bu lobide her akşam canlı kodlama ve oyun saatimiz var."
+                    maxLength={300}
+                    className="w-full border-2 border-black p-2.5 font-bold text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#06B6D4]"
                   />
+                  <p className="text-[10px] font-bold text-gray-500">
+                    Odaya giren tüm üyelerin sohbetin üstünde göreceği sabit duyuru bandıdır.
+                  </p>
                 </div>
-                <div>
-                  <label className="block font-black mb-1">Açıklama</label>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    autoComplete="off"
-                    className="w-full border-2 border-black p-2 font-bold min-h-[100px] focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
+
+                {/* Section 5: Live Theme Preview */}
+                <div className="space-y-1.5">
+                  <span className="font-black text-[11px] uppercase text-gray-500 tracking-wider">
+                    Önizleme (Lobi Başlığı)
+                  </span>
+                  {(() => {
+                    const currentThemeConfig = getLobbyTheme(theme);
+                    return (
+                      <div className="border-3 border-black shadow-[4px_4px_0_0_#000] overflow-hidden rounded-xs">
+                        <div className={`p-3 border-b-2 border-black flex items-center justify-between ${currentThemeConfig.headerGradient}`}>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">{icon}</span>
+                            <div>
+                              <p className="font-black text-sm text-black leading-tight">{name || "Lobi Adı"}</p>
+                              <p className="text-[10px] font-bold text-black/80">{description || "Oda açıklaması"}</p>
+                            </div>
+                          </div>
+                          <span className={`text-[10px] font-black uppercase px-2 py-0.5 border border-black shadow-[1px_1px_0_0_#000] ${currentThemeConfig.badgeBg}`}>
+                            ÖNİZLEME
+                          </span>
+                        </div>
+                        {announcement && (
+                          <div className="p-2 bg-[#FEF08A] text-black font-black text-xs flex items-center gap-1.5 border-b border-black">
+                            <span>📢</span>
+                            <span className="truncate">{announcement}</span>
+                          </div>
+                        )}
+                        <div className="p-4 bg-white text-center text-xs font-bold text-gray-400">
+                          Sohbet akışı bu alanda lobi teması tonlarıyla listelenecektir.
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
+
+                {/* Save Button */}
                 <Button 
                   onClick={handleUpdateLobby} 
                   disabled={updatingSettings}
-                  className="w-full brutal-btn bg-green-400 hover:bg-green-500 text-black cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all font-black uppercase"
+                  className="w-full h-11 brutal-btn bg-[#06B6D4] hover:bg-[#0891B2] text-black cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all font-black uppercase text-sm border-2 border-black shadow-[3px_3px_0_0_#000]"
                 >
-                  {updatingSettings ? "Kaydediliyor..." : "Ayarları Kaydet"}
+                  {updatingSettings ? "Kaydediliyor..." : "Ayarları ve Temayı Kaydet"}
                 </Button>
               </div>
             </TabsContent>
           )}
+
+          {/* Görünüm & Tema Tab (Both Members and Owners) */}
+          <TabsContent value="themes" className="flex-1 overflow-y-auto">
+            <div className="space-y-6 bg-white p-5 brutal-border">
+              {/* Section 1: Kişisel Lobi Sohbet Teması (Tüm Üyeler İçin) */}
+              <div className="space-y-3 pb-4 border-b-2 border-black/20">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-black text-sm uppercase text-black flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-cyan-600" />
+                      <span>Kişisel Lobi Sohbet Teması</span>
+                    </h4>
+                    <p className="text-xs font-bold text-gray-600">
+                      Lobi içindeki mesaj baloncuklarınız ve sohbet pencereniz için dilediğiniz temayı seçin.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-[#FEF08A] text-black border border-black shrink-0">
+                    Tüm Üyeler
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {[
+                    {
+                      id: null,
+                      name: "Standart Neo-Brutalist",
+                      desc: "Varsayılan retro mor ve beyaz baloncuklar",
+                      previewClass: "bg-[#f3e8ff] text-black border-2 border-black",
+                    },
+                    {
+                      id: "lobby_theme_cyber_neon",
+                      name: "Siber Neon Lobi",
+                      desc: "Koyu lacivert zemin ve parlak camgöbeği neon",
+                      previewClass: "bg-[#0B1120] text-[#38BDF8] border-2 border-[#06B6D4]",
+                    },
+                    {
+                      id: "lobby_theme_retro_arcade",
+                      name: "Retro Atari Salonu",
+                      desc: "Kehribar sarısı nostaljik atari baloncukları",
+                      previewClass: "bg-[#FEF08A] text-black border-2 border-black",
+                    },
+                    {
+                      id: "lobby_theme_matrix_hacker",
+                      name: "Matrix Terminali",
+                      desc: "Karanlık hacker terminali yeşili",
+                      previewClass: "bg-[#051509] text-[#22C55E] border-2 border-[#22C55E]",
+                    },
+                    {
+                      id: "lobby_theme_lavender_haze",
+                      name: "Pastel Lavanta",
+                      desc: "Yumuşak ve dinlendirici lavanta tonları",
+                      previewClass: "bg-[#E9D5FF] text-[#581C87] border-2 border-[#7E22CE]",
+                    },
+                  ].map((item) => {
+                    const isSelected = (equippedLobbyTheme || null) === item.id;
+                    return (
+                      <div
+                        key={String(item.id)}
+                        onClick={() => handleSelectPersonalLobbyTheme(item.id)}
+                        className={`p-3 border-2 border-black rounded-xs cursor-pointer transition-all ${
+                          isSelected
+                            ? "bg-white shadow-[3px_3px_0_0_#000] -translate-y-0.5 ring-2 ring-[#0891B2]"
+                            : "bg-gray-50 hover:bg-white shadow-[1px_1px_0_0_#000]"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-black text-xs text-black">{item.name}</span>
+                          {isSelected && (
+                            <span className="w-4 h-4 rounded-full bg-[#4ADE80] border border-black flex items-center justify-center text-[10px] font-black text-black">
+                              ✓
+                            </span>
+                          )}
+                        </div>
+                        <div className={`p-2 rounded-xs text-[11px] font-bold mb-1.5 ${item.previewClass}`}>
+                          "Lobi içi mesaj örneği 💬"
+                        </div>
+                        <p className="text-[10px] font-medium text-gray-500">{item.desc}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Section 2: Oda Genel Teması & Renk Paleti */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-black text-sm uppercase text-black flex items-center gap-1.5">
+                      <Palette className="w-4 h-4 text-purple-600" />
+                      <span>Oda Başlığı & Genel Lobi Teması</span>
+                    </h4>
+                    <p className="text-xs font-bold text-gray-600">
+                      Odadaki tüm üyelerin göreceği başlık degrade rengi ve genel atmosferi belirler.
+                    </p>
+                  </div>
+                  {myRole === 'OWNER' ? (
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-[#4ADE80] text-black border border-black shrink-0">
+                      Yönetici Yetkisi
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-gray-200 text-gray-600 border border-black shrink-0">
+                      Yalnızca Kurucu
+                    </span>
+                  )}
+                </div>
+
+                {myRole === 'OWNER' ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      {LOBBY_THEMES.map((th) => {
+                        const isSelected = theme === th.id;
+                        return (
+                          <div
+                            key={th.id}
+                            onClick={() => setTheme(th.id)}
+                            className={`p-3 border-2 border-black rounded-xs cursor-pointer transition-all ${
+                              isSelected
+                                ? "bg-white shadow-[4px_4px_0_0_#000] -translate-y-0.5 ring-2 ring-[#0891B2]"
+                                : "bg-gray-50/70 hover:bg-white shadow-[2px_2px_0_0_#000]"
+                            }`}
+                          >
+                            <div className={`h-6 w-full border border-black mb-2 rounded-xs ${th.headerGradient}`} />
+                            <div className="flex items-center justify-between">
+                              <span className="font-black text-xs text-black">{th.name}</span>
+                              {isSelected && <span className="text-xs">✓</span>}
+                            </div>
+                            <p className="text-[10px] font-medium text-gray-600 line-clamp-1 mt-0.5">
+                              {th.description}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <Button 
+                      onClick={handleUpdateLobby} 
+                      disabled={updatingSettings}
+                      className="w-full h-11 brutal-btn bg-[#06B6D4] hover:bg-[#0891B2] text-black cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all font-black uppercase text-sm border-2 border-black shadow-[3px_3px_0_0_#000]"
+                    >
+                      {updatingSettings ? "Kaydediliyor..." : "Oda Genel Temasını Kaydet"}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xs text-center space-y-1">
+                    <p className="text-xs font-bold text-gray-700">
+                      Bu odanın genel teması: <strong className="text-black">{getLobbyTheme(theme).name}</strong>
+                    </p>
+                    <p className="text-[11px] font-medium text-gray-500">
+                      Oda başlığı renk paleti sadece lobi kurucusu tarafından değiştirilebilir. Kendi mesajlaşma temanızı yukarıdan dilediğiniz gibi seçebilirsiniz.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </TabsContent>
 
           <TabsContent value="notifications" className="flex-1 overflow-y-auto">
             <div className="space-y-4 bg-white p-5 brutal-border">

@@ -22,8 +22,22 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { MoreVertical, Ban, UserMinus, MicOff, Mic, Settings, Bot, Gamepad2, Swords, Dices, Coins, Sparkles, BarChart2 } from "lucide-react";
+import { MoreVertical, Ban, UserMinus, MicOff, Mic, Settings, Bot, Gamepad2, Swords, Dices, Coins, Sparkles, BarChart2, Pencil, Trash2, Check, X } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { LobbySettingsDialog } from "@/components/lobby/LobbySettingsDialog";
+import { LobbyXpBar } from "@/components/lobby/LobbyXpBar";
+import { LobbyGamesBar } from "@/components/lobby/LobbyGamesBar";
+import { LobbyGameCard, isLobbyGameMessage } from "@/components/lobby/LobbyGameCard";
+import { LobbySlotSpinner } from "@/components/lobby/LobbySlotSpinner";
 import { UserProfileDialog } from "@/components/profile/UserProfileDialog";
 import { MembersList } from "@/components/lobby/MembersList";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
@@ -36,8 +50,13 @@ import { CreatePollModal } from "@/components/lobby/CreatePollModal";
 import { LobbyPollCard } from "@/components/lobby/LobbyPollCard";
 import { LobbyPollsDialog } from "@/components/lobby/LobbyPollsDialog";
 import { pollsApi, Poll } from "@/lib/api/polls";
-import { getAvatarUrl } from "@/lib/avatar";
 import { toast } from "@/components/ui/toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queryKeys";
+import { getAvatarUrl } from "@/lib/avatar";
+import { getLobbyTheme } from "@/lib/lobbyThemes";
+import { trackQuestAction } from "@/data/dailyQuests";
+import { getEquippedCosmetics, getLobbyThemeStyles } from "@/lib/cosmetics";
 
 
 
@@ -48,6 +67,7 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
   
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
   
   const [lobby, setLobby] = useState<Lobby | null>(null);
   const [messages, setMessages] = useState<MessageResponse[]>([]);
@@ -56,6 +76,10 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
   const [error, setError] = useState<string | null>(null);
   
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
+  const [unreadMessages, setUnreadMessages] = useState(false);
+  const [quickGamePending, setQuickGamePending] = useState<string | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -72,6 +96,21 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
   };
 
   const [isMemberVerified, setIsMemberVerified] = useState(false);
+  const [equippedLobbyTheme, setEquippedLobbyTheme] = useState<string | null>(null);
+
+  useEffect(() => {
+    const cosmetics = getEquippedCosmetics();
+    setEquippedLobbyTheme(cosmetics.lobby_theme || null);
+
+    const handleCosmeticsUpdate = (e: any) => {
+      setEquippedLobbyTheme(e.detail?.lobby_theme || null);
+    };
+
+    window.addEventListener("lobby:cosmetics_updated", handleCosmeticsUpdate);
+    return () => window.removeEventListener("lobby:cosmetics_updated", handleCosmeticsUpdate);
+  }, []);
+
+  const lobbyChatTheme = getLobbyThemeStyles(equippedLobbyTheme);
 
   // Role detection
   const myLobbyMember = lobbyMembers.find((m) => m.user_id === user?.id);
@@ -114,6 +153,80 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
   const [isPollCollapsed, setIsPollCollapsed] = useState(false);
 
 
+  // Edit & Delete Message States
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState("");
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleStartEdit = (msg: MessageResponse) => {
+    setEditingMessageId(msg.id);
+    setEditingContent(msg.content);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditingContent("");
+  };
+
+  const handleSaveEdit = async (msgId: string) => {
+    const trimmed = editingContent.trim();
+    if (!trimmed) {
+      toast.add({
+        title: "Hata",
+        description: "Mesaj içeriği boş bırakılamaz.",
+        type: "error",
+      });
+      return;
+    }
+    setIsSubmittingEdit(true);
+    try {
+      const updated = await lobbiesApi.updateMessage(lobbyId, msgId, trimmed);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msgId ? { ...m, ...updated } : m))
+      );
+      setEditingMessageId(null);
+      setEditingContent("");
+      toast.add({
+        title: "Mesaj Güncellendi",
+        description: "Mesajınız başarıyla düzenlendi.",
+        type: "success",
+      });
+    } catch (err: any) {
+      toast.add({
+        title: "Düzenleme Başarısız",
+        description: err.response?.data?.error?.message || "Mesaj düzenlenemedi.",
+        type: "error",
+      });
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingMessageId) return;
+    setIsDeleting(true);
+    try {
+      await lobbiesApi.deleteMessage(lobbyId, deletingMessageId);
+      setMessages((prev) => prev.filter((m) => m.id !== deletingMessageId));
+      toast.add({
+        title: "Mesaj Silindi",
+        description: "Mesaj odadan kaldırıldı.",
+        type: "info",
+      });
+      setDeletingMessageId(null);
+    } catch (err: any) {
+      toast.add({
+        title: "Silme Başarısız",
+        description: err.response?.data?.error?.message || "Mesaj silinemedi.",
+        type: "error",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // Typing state refs
   const lastTypingSentRef = useRef<number>(0);
   const stopTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -123,6 +236,14 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
 
     if (event.type === "message.created") {
       const newMsg = event.payload as MessageResponse;
+      if (newMsg.sender.id === user?.id && /^(🎲 Zar attı:|🪙 Yazı-tura attı:|🎰 \[SLOT\])/.test(newMsg.content)) {
+        setQuickGamePending(null);
+      }
+      if (newMsg.content.startsWith("🎰 [SLOT]:")) setQuickGamePending(null);
+      if (newMsg.content.startsWith("🎰 [SLOT]:") && newMsg.content.includes("JACKPOT!")) {
+        setShowConfetti(true);
+        window.setTimeout(() => setShowConfetti(false), 1800);
+      }
       setMessages((prev) => {
         // If an optimistic temp message exists matching content and sender, replace it
         const tempIndex = prev.findIndex(
@@ -136,6 +257,30 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
         if (prev.some((m) => m.id === newMsg.id)) return prev;
         return [...prev, newMsg];
       });
+    } else if (event.type === "bomb.expired") {
+      const payload = event.payload as { target?: number };
+      setMessages((prev) => [...prev, {
+        id: `sys-bomb-${Date.now()}`,
+        lobby_id: lobbyId,
+        sender: { id: "system", username: "Sistem", display_name: null, avatar_url: null },
+        content: `💣 [BOMBA]: Süre doldu! Bomba sayısı ${payload.target ?? "?"} idi.`,
+        is_bot: true,
+        created_at: new Date().toISOString(),
+      }]);
+    } else if (event.type === "lobby.xp.updated") {
+      const payload = event.payload as { xp?: number };
+      const xp = payload.xp;
+      if (typeof xp === "number") setLobby((prev) => prev ? { ...prev, xp } : prev);
+    } else if (event.type === "message.updated") {
+      const updatedMsg = event.payload as MessageResponse;
+      setMessages((prev) =>
+        prev.map((msg) => (msg.id === updatedMsg.id ? { ...msg, ...updatedMsg } : msg))
+      );
+    } else if (event.type === "message.deleted") {
+      const payload = event.payload as { message_id?: string };
+      if (payload?.message_id) {
+        setMessages((prev) => prev.filter((msg) => msg.id !== payload.message_id));
+      }
     } else if (event.type === "user.joined") {
       const payload = event.payload as { user?: { username?: string; id?: string } } | undefined;
       const username = payload?.user?.username || "Bir kullanıcı";
@@ -151,11 +296,21 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
             created_at: new Date().toISOString(),
           },
         ]);
+        // Immediately fetch fresh member list so new joiner appears in real-time
+        lobbiesApi.getMembers(lobbyId).then((freshMembers) => {
+          setLobbyMembers(freshMembers);
+          setLobby((prev) => prev ? { ...prev, member_count: freshMembers.length } : prev);
+        }).catch(console.error);
+        queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.members(lobbyId) });
       }
     } else if (event.type === "user.left") {
       const payload = event.payload as { user?: { username?: string; id?: string } } | undefined;
       const username = payload?.user?.username || "Bir kullanıcı";
-      if (payload?.user?.id !== user?.id) {
+      const leftUserId = payload?.user?.id;
+      if (leftUserId && leftUserId !== user?.id) {
+        setLobbyMembers((prev) => prev.filter((m) => m.user_id !== leftUserId));
+        setLobby((prev) => prev ? { ...prev, member_count: Math.max(0, prev.member_count - 1) } : prev);
+        queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.members(lobbyId) });
         setMessages((prev) => [
           ...prev,
           {
@@ -169,11 +324,18 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
         ]);
       }
     } else if (event.type === "moderation.event") {
-      const { action, target_user_id, duration_minutes } =
-        (event.payload as { action?: string; target_user_id?: string; duration_minutes?: number } || {});
+      const { action, target_user_id, duration_minutes, role: newRole } =
+        (event.payload as { action?: string; target_user_id?: string; duration_minutes?: number; role?: string } || {});
 
-      if (target_user_id === user?.id) {
-        if (action === "kick" || action === "ban") {
+      // Immediate real-time member list sync on moderation actions
+      if (action === "kick" || action === "ban") {
+        if (target_user_id) {
+          setLobbyMembers((prev) => prev.filter((m) => m.user_id !== target_user_id));
+          setLobby((prev) => prev ? { ...prev, member_count: Math.max(0, prev.member_count - 1) } : prev);
+          queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.members(lobbyId) });
+        }
+
+        if (target_user_id === user?.id) {
           toast.add({
             title: action === "kick" ? "Lobiden Atıldınız" : "Lobiden Yasaklandınız",
             description: action === "kick" ? "Lobi yöneticisi sizi bu lobiden çıkardı." : "Lobi yöneticisi sizi bu lobiden yasakladı.",
@@ -181,7 +343,27 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
           });
           router.push("/lobbies");
           return;
-        } else if (action === "mute") {
+        }
+      } else if (action === "role_update") {
+        if (target_user_id && newRole) {
+          setLobbyMembers((prev) =>
+            prev.map((m) => (m.user_id === target_user_id ? { ...m, role: newRole } : m))
+          );
+          queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.members(lobbyId) });
+
+          if (target_user_id === user?.id) {
+            const roleName = newRole === "MODERATOR" ? "Moderatör" : "Üye";
+            toast.add({
+              title: "Rolünüz Güncellendi",
+              description: `Bu lobideki yetkiniz "${roleName}" olarak güncellendi.`,
+              type: "info",
+            });
+          }
+        }
+      }
+
+      if (target_user_id === user?.id) {
+        if (action === "mute") {
           const durationStr = duration_minutes ? `${duration_minutes} dakika` : "süresiz olarak";
           setMessages((prev) => [
             ...prev,
@@ -218,6 +400,7 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
           if (action === "ban") sysContent = `${username} lobiden yasaklandı.`;
           if (action === "mute") sysContent = `${username} susturuldu.`;
           if (action === "unmute") sysContent = `${username} susturması kaldırıldı.`;
+          if (action === "role_update") sysContent = `${username} rolü güncellendi: ${newRole === "MODERATOR" ? "Moderatör" : "Üye"}.`;
 
           if (!sysContent) return prev;
 
@@ -234,6 +417,25 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
           ];
         });
       }
+    } else if (event.type === "user.role_updated") {
+      const payload = event.payload as { user_id?: string; role?: string; lobby_id?: string } | undefined;
+      const targetId = payload?.user_id;
+      const newRole = payload?.role;
+      if (targetId && newRole) {
+        setLobbyMembers((prev) =>
+          prev.map((m) => (m.user_id === targetId ? { ...m, role: newRole } : m))
+        );
+        queryClient.invalidateQueries({ queryKey: queryKeys.lobbies.members(lobbyId) });
+
+        if (targetId === user?.id) {
+          const roleName = newRole === "MODERATOR" ? "Moderatör" : "Üye";
+          toast.add({
+            title: "Rolünüz Güncellendi",
+            description: `Bu lobideki yetkiniz "${roleName}" olarak güncellendi.`,
+            type: "info",
+          });
+        }
+      }
     } else if (event.type === "game.event") {
       const payload = event.payload as {
         sender_id: string;
@@ -243,7 +445,10 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
       setIncomingGameEvent(payload);
 
       const actionData = payload?.data;
-      if (actionData.type === "trivia_session_start") {
+      if (actionData.type === "slot_spin") {
+        setQuickGamePending("/slot");
+        window.setTimeout(() => setQuickGamePending(null), 1800);
+      } else if (actionData.type === "trivia_session_start") {
         setTriviaActive(true);
       } else if (actionData.gameType === "rps" && actionData.type === "rps_challenge" && actionData.targetId === user?.id) {
         toast.add({
@@ -288,12 +493,44 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
   const {
     isConnected,
     error: wsError,
-    sendMessage,
+    sendMessage: rawSendMessage,
     sendTyping,
     sendGameAction,
     typingUsers,
     setTypingUsers,
   } = useWebSocket(lobbyId, isMemberVerified, handleIncomingWsEvent);
+
+  const sendMessage = useCallback((content: string) => {
+    if (content.startsWith("/zar")) {
+      trackQuestAction("dice_rolled");
+    } else if (content.startsWith("/tkm") || content.includes("Taş-Kağıt-Makas")) {
+      trackQuestAction("rps_played");
+    } else if (content.startsWith("/soru") || content.includes("[GÜNÜN TARTIŞMA SORUSU]")) {
+      trackQuestAction("icebreaker_sent");
+    } else {
+      trackQuestAction("message_sent");
+    }
+
+    if (content.includes("@")) {
+      trackQuestAction("ai_chat");
+    }
+
+    rawSendMessage(content);
+  }, [rawSendMessage]);
+
+  const runQuickGame = useCallback((command: string) => {
+    if (!isConnected) return;
+    if (["/zar", "/yazitura", "/slot"].includes(command)) {
+      setQuickGamePending(command);
+      window.setTimeout(() => setQuickGamePending(null), 5000);
+    }
+    if (command === "/slot") {
+      sendGameAction({ type: "slot_spin" });
+      window.setTimeout(() => sendMessage(command), 1000);
+    } else {
+      sendMessage(command);
+    }
+  }, [isConnected, sendMessage, sendGameAction]);
 
 
   // Fetch initial data
@@ -331,6 +568,7 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
         setIsMemberVerified(true);
         setLobby(lobbyData);
         setLobbyMembers(currentMembers);
+        trackQuestAction("lobby_visited");
 
         // Step 3: Now that membership is active, load messages safely
         const messagesData = await lobbiesApi.getMessages(lobbyId);
@@ -405,12 +643,27 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
     };
   }, [isAuthenticated, lobbyId]);
 
-  // Auto-scroll messages container to bottom without scrolling ancestors
+  const scrollToLatest = useCallback(() => {
+    const container = chatScrollRef.current;
+    if (!container) return;
+    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    isNearBottomRef.current = true;
+    setUnreadMessages(false);
+  }, []);
+
+  // Follow the conversation only while the reader is already at the bottom.
   useEffect(() => {
-    if (chatScrollRef.current) {
+    const container = chatScrollRef.current;
+    if (!container) return;
+    if (isNearBottomRef.current) container.scrollTop = container.scrollHeight;
+    else setUnreadMessages(true);
+  }, [messages]);
+
+  useEffect(() => {
+    if (quickGamePending && isNearBottomRef.current && chatScrollRef.current) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [quickGamePending]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -434,6 +687,12 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
       return;
     }
 
+    if (["/zar", "/yazitura", "/slot", "/bomba", "/dvc"].includes(content)) {
+      runQuickGame(content);
+      setInputMessage("");
+      return;
+    }
+
 
 
     // Optimistically add user's message immediately so it's always rendered right away
@@ -451,7 +710,9 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
       is_bot: false,
       created_at: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, optimisticMsg]);
+    if (!/^\d{1,3}$/.test(content) && !content.startsWith("/dvc ")) {
+      setMessages((prev) => [...prev, optimisticMsg]);
+    }
 
     sendMessage(content);
     setInputMessage("");
@@ -644,6 +905,7 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
     try {
       const updated = await pollsApi.votePoll(lobbyId, pollId, optionId);
       setPolls((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      trackQuestAction("poll_voted");
     } catch (err: any) {
       toast.add({
         title: "Hata",
@@ -720,98 +982,125 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
     );
   }
 
+  const lobbyThemeConfig = getLobbyTheme(lobby.theme);
+
   return (
     <ProtectedRoute>
     <div className="flex h-full min-h-0 w-full bg-[#f8fafc] border-4 border-black brutal-shadow rounded-sm overflow-hidden animate-fade-in">
+      {showConfetti && (
+        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center text-5xl animate-bounce" aria-label="Slot jackpot kutlaması">
+          🎉 ✨ 🎊 💎 🎉
+        </div>
+      )}
       
       {/* Center Column: Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-[#f4f4f5] h-full">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-[#FEF08A] via-[#FFEDD5] to-[#FCE7F3] border-b-4 border-black p-4 flex justify-between items-center z-10 shrink-0">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-black tracking-tight text-black">{lobby.name}</h1>
-            <Badge variant={lobby.visibility === "PRIVATE" ? "destructive" : "default"} className="bg-black text-white border-black font-bold">
-              {lobby.visibility === "PRIVATE" ? "ÖZEL" : "HERKESE AÇIK"}
-            </Badge>
-            {isConnected ? (
-              <Badge className="bg-[#4ade80] text-black font-black">Canlı</Badge>
-            ) : isMemberVerified ? (
-              <Badge variant="destructive" className="font-bold animate-pulse">Bağlantı kuruluyor...</Badge>
-            ) : (
-              <Badge variant="outline" className="font-bold bg-[#FEF08A] text-black border-black animate-pulse">Odaya giriliyor...</Badge>
-            )}
-          </div>
-          <p className="text-sm font-bold text-black/75">{lobby.description || "Açıklama bulunmuyor"}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Party Games Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button variant="outline" className="bg-[#4ADE80] hover:bg-[#22C55E] text-black border-2 border-black font-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all">
-                  <Gamepad2 className="w-4 h-4 mr-1.5" /> Parti Oyunları
+      <div className={`flex-1 flex flex-col min-w-0 min-h-0 ${lobbyThemeConfig.chatBg} h-full`}>
+            {/* Header */}
+            <div className={`lobby-header-banner ${equippedLobbyTheme ? lobbyChatTheme.headerGradient : lobbyThemeConfig.headerGradient} border-b-4 border-black p-4 flex justify-between items-center z-10 shrink-0 transition-colors ${lobby.xp >= 100 ? "animate-fade-in" : ""}`}>
+              <div>
+                <div className="flex items-center gap-3 mb-1">
+                  <span className="w-9 h-9 rounded-sm bg-white border-2 border-black flex items-center justify-center text-xl shadow-[2px_2px_0_0_#000] shrink-0" title="Lobi İkonu">
+                    {lobby.icon || "💬"}
+                  </span>
+                  <h1 className={`text-2xl font-black tracking-tight ${equippedLobbyTheme ? lobbyChatTheme.headerTitleClass : "text-black"}`}>{lobby.name}</h1>
+                  <LobbyXpBar xp={lobby.xp} />
+                  <Badge variant={lobby.visibility === "PRIVATE" ? "destructive" : "default"} className="bg-black text-white border-black font-bold">
+                    {lobby.visibility === "PRIVATE" ? "ÖZEL" : "HERKESE AÇIK"}
+                  </Badge>
+                  {isConnected ? (
+                    <Badge className="bg-[#4ade80] text-black font-black">Canlı</Badge>
+                  ) : isMemberVerified ? (
+                    <Badge variant="destructive" className="font-bold animate-pulse">Bağlantı kuruluyor...</Badge>
+                  ) : (
+                    <Badge variant="outline" className="font-bold bg-[#FEF08A] text-black border-black animate-pulse">Odaya giriliyor...</Badge>
+                  )}
+                </div>
+                <p className={`text-sm font-bold ${equippedLobbyTheme ? lobbyChatTheme.headerSubtitleClass : "text-black/75"}`}>{lobby.description || "Açıklama bulunmuyor"}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Party Games Menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button variant="outline" className="bg-[#06B6D4] hover:bg-[#0891B2] text-black border-2 border-black font-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all">
+                        <Gamepad2 className="w-4 h-4 mr-1.5" /> Parti Oyunları
+                      </Button>
+                    }
+                  />
+                  <DropdownMenuContent align="end" className="bg-white brutal-border border-2 shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-1.5 font-bold z-50 text-xs w-52">
+                    <DropdownMenuItem
+                      onClick={() => setTriviaActive(true)}
+                      className="flex items-center gap-2 p-2 hover:bg-[#FEF08A] cursor-pointer rounded-none font-bold"
+                    >
+                      <Sparkles className="w-4 h-4 text-purple-600" />
+                      <span>Canlı Trivia Başlat</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setCreatePollOpen(true)}
+                      className="flex items-center gap-2 p-2 hover:bg-[#FEF08A] cursor-pointer rounded-none font-bold"
+                    >
+                      <BarChart2 className="w-4 h-4 text-emerald-600" />
+                      <span>Yeni Anket Oluştur</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => runQuickGame("/zar")}
+                      className="flex items-center gap-2 p-2 hover:bg-[#FEF08A] cursor-pointer rounded-none font-bold"
+                    >
+                      <Dices className="w-4 h-4 text-blue-600" />
+                      <span>Zar At (/zar)</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => runQuickGame("/yazitura")}
+                      className="flex items-center gap-2 p-2 hover:bg-[#FEF08A] cursor-pointer rounded-none font-bold"
+                    >
+                      <Coins className="w-4 h-4 text-amber-600" />
+                      <span>Yazı-Tura At (/yazitura)</span>
+                    </DropdownMenuItem>
+                    {["/bomba", "/dvc", "/slot"].map((command) => (
+                      <DropdownMenuItem key={command} onClick={() => runQuickGame(command)} className="flex items-center gap-2 p-2 hover:bg-[#FEF08A] cursor-pointer rounded-none font-bold">
+                        {command === "/bomba" ? "💣 Sohbet Bombası" : command === "/dvc" ? "🎭 Doğruluk mu Cesaret mi?" : "🎰 Şans Slotu"}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Polls Hub Button */}
+                <Button
+                  variant="outline"
+                  className="bg-[#FEF08A] hover:bg-[#FDE047] text-black border-2 border-black font-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all flex items-center gap-1.5"
+                  onClick={() => setPollsDialogOpen(true)}
+                >
+                  <BarChart2 className="w-4 h-4 text-black" />
+                  <span>Anketler</span>
+                  {activePollsCount > 0 && (
+                    <span className="bg-black text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                      {activePollsCount}
+                    </span>
+                  )}
                 </Button>
-              }
-            />
-            <DropdownMenuContent align="end" className="bg-white brutal-border border-2 shadow-[4px_4px_0_0_rgba(0,0,0,1)] p-1.5 font-bold z-50 text-xs w-52">
-              <DropdownMenuItem
-                onClick={() => setTriviaActive(true)}
-                className="flex items-center gap-2 p-2 hover:bg-[#FEF08A] cursor-pointer rounded-none font-bold"
-              >
-                <Sparkles className="w-4 h-4 text-purple-600" />
-                <span>Canlı Trivia Başlat</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setCreatePollOpen(true)}
-                className="flex items-center gap-2 p-2 hover:bg-[#FEF08A] cursor-pointer rounded-none font-bold"
-              >
-                <BarChart2 className="w-4 h-4 text-emerald-600" />
-                <span>Yeni Anket Oluştur</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => sendMessage("/zar")}
-                className="flex items-center gap-2 p-2 hover:bg-[#FEF08A] cursor-pointer rounded-none font-bold"
-              >
-                <Dices className="w-4 h-4 text-blue-600" />
-                <span>Zar At (/zar)</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => sendMessage("/yazitura")}
-                className="flex items-center gap-2 p-2 hover:bg-[#FEF08A] cursor-pointer rounded-none font-bold"
-              >
-                <Coins className="w-4 h-4 text-amber-600" />
-                <span>Yazı-Tura At (/yazitura)</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
 
-          {/* Polls Hub Button */}
-          <Button
-            variant="outline"
-            className="bg-[#FEF08A] hover:bg-[#FDE047] text-black border-2 border-black font-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all flex items-center gap-1.5"
-            onClick={() => setPollsDialogOpen(true)}
-          >
-            <BarChart2 className="w-4 h-4 text-black" />
-            <span>Anketler</span>
-            {activePollsCount > 0 && (
-              <span className="bg-black text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
-                {activePollsCount}
-              </span>
+                <Button data-testid="lobby-room-settings-btn" variant="outline" className="bg-white hover:bg-[#FEF08A] text-black border-2 border-black font-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all" onClick={() => setSettingsOpen(true)}>
+                  <Settings className="w-4 h-4 mr-2" /> Ayarlar
+                </Button>
+                <Button variant="outline" className="bg-white hover:bg-[#FFE4E6] text-black border-2 border-black font-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all" onClick={() => router.push("/lobbies")}>
+                  Ayrıl
+                </Button>
+              </div>
+            </div>
+
+            {/* Pinned Lobby Announcement Banner */}
+            {lobby.announcement && (
+              <div className="bg-[#FEF9C3] border-b-4 border-black px-4 py-2.5 flex items-center gap-2.5 shrink-0 shadow-[0_2px_0_0_rgba(0,0,0,1)] z-15">
+                <span className="text-xs font-black uppercase tracking-wider bg-black text-[#FEF08A] px-2 py-0.5 rounded-sm shrink-0 flex items-center gap-1">
+                  📢 DUYURU
+                </span>
+                <p className="text-xs font-black text-black truncate flex-1">
+                  {lobby.announcement}
+                </p>
+              </div>
             )}
-          </Button>
 
-          <Button variant="outline" className="bg-white hover:bg-[#FEF08A] text-black border-2 border-black font-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all" onClick={() => setSettingsOpen(true)}>
-            <Settings className="w-4 h-4 mr-2" /> Ayarlar
-          </Button>
-          <Button variant="outline" className="bg-white hover:bg-[#FFE4E6] text-black border-2 border-black font-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:-translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all" onClick={() => router.push("/lobbies")}>
-            Ayrıl
-          </Button>
-        </div>
-      </div>
-
-
-      {/* Pending 1v1 RPS Challenge Banner */}
+            {/* Pending 1v1 RPS Challenge Banner */}
       {pendingRpsChallenge && (
         <div className="bg-[#FED7AA] border-b-4 border-black p-3 px-4 flex items-center justify-between shrink-0 animate-fade-in shadow-[0_2px_0_0_rgba(0,0,0,1)] z-20">
           <div className="flex items-center gap-2 font-black text-sm text-black">
@@ -906,7 +1195,16 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
 
 
       {/* Chat Area */}
-      <div ref={chatScrollRef} className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 bg-[#f4f4f5] flex flex-col gap-4">
+      <div 
+        ref={chatScrollRef} 
+        data-chat-theme={equippedLobbyTheme || "default"}
+        onScroll={(event) => {
+          const element = event.currentTarget;
+          isNearBottomRef.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+          if (isNearBottomRef.current) setUnreadMessages(false);
+        }} 
+        className={`flex-1 min-h-0 overflow-y-auto p-4 md:p-6 flex flex-col gap-4 transition-colors ${lobbyChatTheme.chatContainerClass}`}
+      >
         {messages.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-foreground/50 font-medium">
             Henüz mesaj yok. İlk mesajı siz yazın!
@@ -914,9 +1212,19 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
         ) : (
           messages.map((msg) => {
             const isMe = msg.sender.id === user?.id;
+            const isEditing = editingMessageId === msg.id;
+            const wasEdited = Boolean(
+              msg.updated_at &&
+              msg.created_at &&
+              new Date(msg.updated_at).getTime() - new Date(msg.created_at).getTime() > 1000
+            );
             
-            // Calmer Neo-Brutalist bubbles
-            const bubbleBg = msg.is_bot ? "bg-[#cffafe]" : isMe ? "bg-[#f3e8ff]" : "bg-white";
+            // Equipped Theme or Calmer Neo-Brutalist bubbles
+            const bubbleClass = msg.is_bot
+              ? "bg-[#cffafe] text-black border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] bot-bubble"
+              : isMe
+              ? `${lobbyChatTheme.myBubbleClass} my-bubble`
+              : `${lobbyChatTheme.otherBubbleClass} other-bubble`;
             const alignmentClass = isMe ? "self-end" : "self-start";
             
             return (
@@ -925,7 +1233,13 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
                   {!isMe && (
                     <>
                       <span 
-                        className="font-bold text-sm cursor-pointer hover:underline text-black" 
+                        className={`font-bold text-sm cursor-pointer hover:underline ${
+                          equippedLobbyTheme === "lobby_theme_cyber_neon"
+                            ? "text-[#38BDF8]"
+                            : equippedLobbyTheme === "lobby_theme_matrix_hacker"
+                            ? "text-[#4ADE80]"
+                            : "text-current"
+                        }`} 
                         onClick={() => handleOpenProfile(msg.sender.id)}
                       >
                         {msg.sender.username}
@@ -937,8 +1251,20 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
                       )}
                     </>
                   )}
-                  <span className="text-xs text-gray-500 font-bold">
+                  <span className={`text-xs font-bold flex items-center gap-1 ${
+                    equippedLobbyTheme === "lobby_theme_cyber_neon" || equippedLobbyTheme === "lobby_theme_matrix_hacker"
+                      ? "text-slate-400"
+                      : "text-gray-500"
+                  }`}>
                     {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {wasEdited && (
+                      <span
+                        className="text-[10px] text-gray-400 font-medium italic select-none"
+                        title={`Düzenlendi: ${new Date(msg.updated_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                      >
+                        (düzenlendi)
+                      </span>
+                    )}
                   </span>
                 </div>
                 
@@ -964,8 +1290,51 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
                     )}
                   </div>
 
-                  {/* Message Content Bubble */}
-                  {isRichGameMessage(msg.content) ? (
+                  {/* Message Content Bubble or Inline Edit */}
+                  {isEditing ? (
+                    <div className="w-full min-w-[240px] sm:min-w-[320px] max-w-full space-y-2 bg-white p-3 border-2 border-black rounded-sm shadow-[2px_2px_0_0_rgba(0,0,0,1)]">
+                      <textarea
+                        value={editingContent}
+                        onChange={(e) => setEditingContent(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSaveEdit(msg.id);
+                          } else if (e.key === "Escape") {
+                            handleCancelEdit();
+                          }
+                        }}
+                        rows={2}
+                        autoFocus
+                        className="w-full p-2 text-sm font-medium border-2 border-black rounded-sm focus:outline-none focus:ring-2 focus:ring-black bg-gray-50 resize-y"
+                        placeholder="Mesajınızı düzenleyin..."
+                      />
+                      <div className="flex items-center justify-between gap-2 text-[11px] font-bold text-gray-500">
+                        <span>Enter: kaydet • Esc: iptal</span>
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleCancelEdit}
+                            disabled={isSubmittingEdit}
+                            className="h-7 px-2 text-xs font-black border border-black shadow-[1px_1px_0_0_rgba(0,0,0,1)] cursor-pointer"
+                          >
+                            <X className="w-3 h-3 mr-1" /> İptal
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleSaveEdit(msg.id)}
+                            disabled={isSubmittingEdit}
+                            className="h-7 px-2 text-xs font-black bg-[#4ADE80] text-black hover:bg-[#22c55e] border border-black shadow-[1px_1px_0_0_rgba(0,0,0,1)] cursor-pointer"
+                          >
+                            <Check className="w-3 h-3 mr-1" /> {isSubmittingEdit ? "..." : "Kaydet"}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : isLobbyGameMessage(msg.content) ? (
+                    <LobbyGameCard content={msg.content} onChoose={(choice) => sendMessage(`/dvc ${choice}`)} />
+                  ) : isRichGameMessage(msg.content) ? (
                     <RichGameCard
                       content={msg.content}
                       senderName={msg.sender.username}
@@ -973,45 +1342,66 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
                       onAnnounceToChat={(text) => sendMessage(text)}
                     />
                   ) : (
-                    <div className={`${bubbleBg} px-4 py-2.5 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] rounded-sm group-hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-shadow`}>
-                      <p className="whitespace-pre-wrap font-medium break-words leading-relaxed text-black/90">
+                    <div className={`${bubbleClass} px-4 py-2.5 rounded-sm group-hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-shadow`}>
+                      <p className="whitespace-pre-wrap font-medium break-words leading-relaxed text-inherit">
                         {renderMessageContent(msg.content, user?.username)}
                       </p>
                     </div>
                   )}
                   
-                  {!isMe && canModerate && !msg.is_bot && (
-                    <div className={`opacity-0 group-hover:opacity-100 has-[[data-state=open]]:opacity-100 transition-opacity ${isMe ? 'order-first' : ''}`}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-black/10 text-black/50 hover:text-black transition-colors outline-none focus:ring-2 focus:ring-black cursor-pointer">
-                          <MoreVertical className="h-4 w-4" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align={isMe ? "end" : "start"} className="brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] w-48">
-                          <div className="px-2 py-1.5 text-sm font-bold">Moderasyon</div>
-                          <DropdownMenuSeparator className="bg-black" />
-                          <DropdownMenuItem onClick={() => handleModeration('mute', msg.sender.id, 15)} className="font-bold cursor-pointer text-orange-600 focus:bg-orange-100 focus:text-orange-700">
-                            <MicOff className="mr-2 h-4 w-4" />
-                            Kullanıcıyı Sustur (15 dk)
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleModeration('mute', msg.sender.id, 60)} className="font-bold cursor-pointer text-orange-600 focus:bg-orange-100 focus:text-orange-700">
-                            <MicOff className="mr-2 h-4 w-4" />
-                            Kullanıcıyı Sustur (1 sa)
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleModeration('unmute', msg.sender.id)} className="font-bold cursor-pointer text-green-600 focus:bg-green-100 focus:text-green-700">
-                            <Mic className="mr-2 h-4 w-4" />
-                            Susturmayı Kaldır
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator className="bg-black" />
-                          <DropdownMenuItem onClick={() => handleModeration('kick', msg.sender.id)} className="font-bold cursor-pointer text-red-600 focus:bg-red-100 focus:text-red-700">
-                            <UserMinus className="mr-2 h-4 w-4" />
-                            Lobiden At
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleModeration('ban', msg.sender.id)} className="font-bold cursor-pointer text-red-700 focus:bg-red-200 focus:text-red-800">
-                            <Ban className="mr-2 h-4 w-4" />
-                            Lobiden Yasakla
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                  {/* Action Bar for Message Owner or Moderators */}
+                  {!isEditing && !msg.is_bot && !msg.id.startsWith("sys-") && !msg.id.startsWith("temp-") && (
+                    <div className={`opacity-0 group-hover:opacity-100 has-[[data-state=open]]:opacity-100 transition-opacity flex items-center gap-1 ${isMe ? 'order-first' : ''}`}>
+                      {isMe && !isLobbyGameMessage(msg.content) && (
+                        <button
+                          onClick={() => handleStartEdit(msg)}
+                          title="Mesajı Düzenle"
+                          className="w-7 h-7 rounded-sm border border-black bg-white hover:bg-[#FEF08A] text-black shadow-[1px_1px_0_0_rgba(0,0,0,1)] flex items-center justify-center cursor-pointer transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {(isMe || canModerate) && (
+                        <button
+                          onClick={() => setDeletingMessageId(msg.id)}
+                          title="Mesajı Sil"
+                          className="w-7 h-7 rounded-sm border border-black bg-white hover:bg-red-500 hover:text-white text-red-600 shadow-[1px_1px_0_0_rgba(0,0,0,1)] flex items-center justify-center cursor-pointer transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {!isMe && canModerate && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="inline-flex h-7 w-7 items-center justify-center rounded-sm border border-black bg-white hover:bg-gray-100 text-black shadow-[1px_1px_0_0_rgba(0,0,0,1)] transition-colors outline-none focus:ring-2 focus:ring-black cursor-pointer">
+                            <MoreVertical className="h-3.5 w-3.5" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align={isMe ? "end" : "start"} className="brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] w-48 bg-white">
+                            <div className="px-2 py-1.5 text-sm font-bold">Moderasyon</div>
+                            <DropdownMenuSeparator className="bg-black" />
+                            <DropdownMenuItem onClick={() => handleModeration('mute', msg.sender.id, 15)} className="font-bold cursor-pointer text-orange-600 focus:bg-orange-100 focus:text-orange-700">
+                              <MicOff className="mr-2 h-4 w-4" />
+                              Kullanıcıyı Sustur (15 dk)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleModeration('mute', msg.sender.id, 60)} className="font-bold cursor-pointer text-orange-600 focus:bg-orange-100 focus:text-orange-700">
+                              <MicOff className="mr-2 h-4 w-4" />
+                              Kullanıcıyı Sustur (1 sa)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleModeration('unmute', msg.sender.id)} className="font-bold cursor-pointer text-green-600 focus:bg-green-100 focus:text-green-700">
+                              <Mic className="mr-2 h-4 w-4" />
+                              Susturmayı Kaldır
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="bg-black" />
+                            <DropdownMenuItem onClick={() => handleModeration('kick', msg.sender.id)} className="font-bold cursor-pointer text-red-600 focus:bg-red-100 focus:text-red-700">
+                              <UserMinus className="mr-2 h-4 w-4" />
+                              Lobiden At
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleModeration('ban', msg.sender.id)} className="font-bold cursor-pointer text-red-700 focus:bg-red-200 focus:text-red-800">
+                              <Ban className="mr-2 h-4 w-4" />
+                              Lobiden Yasakla
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1021,11 +1411,23 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
         )}
         {/* Active Typing Indicator */}
         <TypingIndicator typingUsers={typingUsers} />
+        {quickGamePending && (
+          <div className="max-w-xs bg-[#EDE9FE] border-2 border-black shadow-[3px_3px_0_0_#000] px-3 py-2 font-black text-sm animate-pulse">
+            {quickGamePending === "/slot" ? <LobbySlotSpinner /> : quickGamePending === "/zar" ? "🎲 Zar dönüyor..." : "🪙 Para dönüyor..."}
+          </div>
+        )}
         {/* End of messages */}
       </div>
 
+      {unreadMessages && (
+        <button type="button" onClick={scrollToLatest} className="self-center -mt-3 mb-1 z-10 bg-[#06B6D4] border-2 border-black shadow-[2px_2px_0_0_#000] px-3 py-1 text-xs font-black cursor-pointer">
+          Yeni mesajlar ↓
+        </button>
+      )}
+
       {/* Input Area */}
-      <div className="bg-[#FEF08A] border-t-4 border-black p-4 shrink-0 relative">
+      <div className={`${lobbyChatTheme.inputBarClass} border-t-4 border-black p-4 shrink-0 relative transition-colors`}>
+        <LobbyGamesBar disabled={!isConnected} onPlay={runQuickGame} />
         {mentionQuery !== null && filteredMentions.length > 0 && (
           <div className="absolute bottom-full left-4 mb-2 bg-white brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rounded-sm overflow-hidden z-50 min-w-[220px] max-h-48 overflow-y-auto">
             <div className="bg-black text-white px-2.5 py-1 text-xs font-bold uppercase tracking-wider flex items-center justify-between">
@@ -1159,7 +1561,7 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
           <Button 
             type="submit" 
             disabled={!isConnected || !inputMessage.trim()}
-            className="h-12 px-8 bg-[#FB923C] hover:bg-[#F97316] text-black font-black text-lg brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-[0px_0px_0px_0px_rgba(0,0,0,1)] active:translate-x-[4px] active:translate-y-[4px] transition-all cursor-pointer"
+            className="h-12 px-8 bg-[#06B6D4] hover:bg-[#0891B2] text-black font-black text-lg brutal-border shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-[0px_0px_0px_0px_rgba(0,0,0,1)] active:translate-x-[4px] active:translate-y-[4px] transition-all cursor-pointer"
           >
             GÖNDER
           </Button>
@@ -1177,6 +1579,7 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
         isLobbyOwner={lobby?.owner_id === user?.id}
         onActionSuccess={refreshMembers}
         onChallengeRps={handleChallengeRps}
+        themeStyles={lobbyChatTheme}
       />
     </div>
 
@@ -1233,8 +1636,33 @@ export default function LobbyChatPage({ params }: { params: Promise<{ id: string
       onOpenCreateModal={() => setCreatePollOpen(true)}
     />
 
+    {/* Delete Message Confirmation Dialog */}
+    <AlertDialog open={!!deletingMessageId} onOpenChange={(open) => !open && setDeletingMessageId(null)}>
+      <AlertDialogContent className="brutal-border border-4 brutal-shadow bg-white p-6 max-w-md">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="text-xl font-black uppercase text-black flex items-center gap-2">
+            <Trash2 className="w-5 h-5 text-red-600" /> Mesajı Sil
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-sm font-bold text-gray-700">
+            Bu mesajı odadan silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="flex gap-2 pt-4">
+          <AlertDialogCancel className="font-bold border-2 border-black uppercase text-xs cursor-pointer">
+            Vazgeç
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleConfirmDelete}
+            disabled={isDeleting}
+            className="font-black bg-red-600 text-white border-2 border-black uppercase text-xs hover:bg-red-700 shadow-[2px_2px_0_0_rgba(0,0,0,1)] cursor-pointer"
+          >
+            {isDeleting ? "Siliniyor..." : "Evet, Sil"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
     </ProtectedRoute>
 
   );
 }
-

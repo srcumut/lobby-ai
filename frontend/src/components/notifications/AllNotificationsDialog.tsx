@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { NotificationResponse } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -104,6 +104,44 @@ export function AllNotificationsDialog({
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>("all");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const hoverTimeoutMapRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const pendingMarkReadRef = useRef<Set<string>>(new Set());
+
+  // Clear hover timeouts on dialog close
+  useEffect(() => {
+    if (!isOpen) {
+      hoverTimeoutMapRef.current.forEach((timeout) => clearTimeout(timeout));
+      hoverTimeoutMapRef.current.clear();
+    }
+  }, [isOpen]);
+
+  const handleItemMouseEnter = (item: NotificationResponse) => {
+    if (item.is_read || pendingMarkReadRef.current.has(item.id)) return;
+
+    // 400ms dwell delay: marks as read only when user deliberately hovers
+    const timeout = setTimeout(() => {
+      pendingMarkReadRef.current.add(item.id);
+      markAsRead(item.id);
+      hoverTimeoutMapRef.current.delete(item.id);
+    }, 400);
+
+    hoverTimeoutMapRef.current.set(item.id, timeout);
+  };
+
+  const handleItemMouseLeave = (itemId: string) => {
+    const timeout = hoverTimeoutMapRef.current.get(itemId);
+    if (timeout) {
+      clearTimeout(timeout);
+      hoverTimeoutMapRef.current.delete(itemId);
+    }
+  };
+
+  const handleItemFocus = (item: NotificationResponse) => {
+    if (item.is_read || pendingMarkReadRef.current.has(item.id)) return;
+    pendingMarkReadRef.current.add(item.id);
+    markAsRead(item.id);
+  };
 
   const filteredNotifications = useMemo(() => {
     return notifications.filter((notif) => {
@@ -295,7 +333,11 @@ export function AllNotificationsDialog({
               <div
                 key={item.id}
                 onClick={() => handleNotificationClick(item)}
-                className={`p-3 sm:p-3.5 border-2 border-black rounded-sm transition-all cursor-pointer group flex items-start gap-3 shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:-translate-y-0.5 ${
+                onMouseEnter={() => handleItemMouseEnter(item)}
+                onMouseLeave={() => handleItemMouseLeave(item.id)}
+                onFocus={() => handleItemFocus(item)}
+                tabIndex={0}
+                className={`p-3 sm:p-3.5 border-2 border-black rounded-sm transition-all cursor-pointer group flex items-start gap-3 shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:shadow-[4px_4px_0_0_rgba(0,0,0,1)] hover:-translate-y-0.5 outline-none focus-visible:ring-2 focus-visible:ring-black ${
                   !item.is_read
                     ? "bg-[#E0F4FF] hover:bg-[#bae6fd]"
                     : "bg-white hover:bg-gray-50"

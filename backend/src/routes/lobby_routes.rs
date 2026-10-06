@@ -31,6 +31,11 @@ pub fn routes() -> Router<SharedState> {
             get(message_handler::get_messages).post(message_handler::create_message),
         )
         .route(
+            "/api/lobbies/{id}/messages/{message_id}",
+            axum::routing::put(message_handler::update_message)
+                .delete(message_handler::delete_message),
+        )
+        .route(
             "/api/lobbies/{id}/messages/{message_id}/reactions",
             post(message_handler::toggle_reaction),
         )

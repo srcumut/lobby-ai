@@ -55,11 +55,9 @@ pub async fn ws_handler(
         Ok(false) => {
             if let Ok(Some(lobby)) = lobby_repository::find_by_id(&state.db, lobby_id).await {
                 if lobby.owner_id == user_id {
-                    let _ = lobby_repository::add_member(&state.db, lobby_id, user_id, "OWNER").await;
-                    true
+                    lobby_repository::add_member(&state.db, lobby_id, user_id, "OWNER").await.is_ok()
                 } else if lobby.visibility == "PUBLIC" {
-                    let _ = lobby_repository::add_member(&state.db, lobby_id, user_id, "MEMBER").await;
-                    true
+                    lobby_repository::add_member(&state.db, lobby_id, user_id, "MEMBER").await.is_ok()
                 } else {
                     false
                 }
@@ -109,6 +107,7 @@ async fn handle_socket(socket: WebSocket, state: SharedState, lobby_id: Uuid, us
         }),
     };
     state.lobby_manager.broadcast(lobby_id, joined_event).await;
+    broadcast_lobby_xp(&state, lobby_id).await;
 
     // Spawn task to forward outgoing events to the WebSocket
     let send_task = tokio::spawn(async move {
@@ -278,6 +277,13 @@ async fn handle_game_action(
         return;
     }
 
+    let action = payload.get("type").and_then(|value| value.as_str());
+    if matches!(action, Some("trivia_session_start") | Some("rps_accept")) {
+        if crate::repositories::game_repository::award_xp(&state.db, lobby_id, 10).await.is_ok() {
+            broadcast_lobby_xp(state, lobby_id).await;
+        }
+    }
+
     let event = WsOutgoingEvent {
         event_type: EVENT_GAME_EVENT.to_string(),
         payload: serde_json::json!({
@@ -326,15 +332,37 @@ async fn handle_message_send(
     // Persist message via service, then broadcast
     match message_service::create_message(state, lobby_id, sender_id, &send_payload.content).await {
         Ok(message_response) => {
+            if send_payload.content.trim().eq_ignore_ascii_case("/bomba") && message_response.content.contains("Başladı!") {
+                let timer_state = state.clone();
+                tokio::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_secs(31)).await;
+                    if let Ok(Some(target)) = crate::repositories::game_repository::expire_bomb(&timer_state.db, lobby_id).await {
+                        timer_state.lobby_manager.broadcast(lobby_id, WsOutgoingEvent {
+                            event_type: "bomb.expired".to_string(),
+                            payload: serde_json::json!({ "target": target }),
+                        }).await;
+                    }
+                });
+            }
             let event = WsOutgoingEvent {
                 event_type: EVENT_MESSAGE_CREATED.to_string(),
                 payload: serde_json::to_value(&message_response).unwrap_or_default(),
             };
             state.lobby_manager.broadcast(lobby_id, event).await;
+            broadcast_lobby_xp(state, lobby_id).await;
         }
         Err(e) => {
             tracing::error!(error = %e, "Failed to create message");
         }
+    }
+}
+
+async fn broadcast_lobby_xp(state: &SharedState, lobby_id: Uuid) {
+    if let Ok(Some(lobby)) = lobby_repository::find_by_id(&state.db, lobby_id).await {
+        state.lobby_manager.broadcast(lobby_id, WsOutgoingEvent {
+            event_type: "lobby.xp.updated".to_string(),
+            payload: serde_json::json!({ "lobby_id": lobby_id, "xp": lobby.xp }),
+        }).await;
     }
 }
 

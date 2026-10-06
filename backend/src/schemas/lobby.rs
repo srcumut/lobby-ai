@@ -18,6 +18,10 @@ pub struct CreateLobbyRequest {
     pub is_private: Option<bool>,
     
     pub password: Option<String>,
+
+    pub theme: Option<String>,
+
+    pub icon: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Validate)]
@@ -31,6 +35,13 @@ pub struct UpdateLobbyRequest {
 
     #[validate(length(max = 500, message = "Description must be at most 500 characters"))]
     pub description: Option<String>,
+
+    pub theme: Option<String>,
+
+    pub icon: Option<String>,
+
+    #[validate(length(max = 500, message = "Announcement must be at most 500 characters"))]
+    pub announcement: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -41,6 +52,10 @@ pub struct LobbyResponse {
     pub owner_id: Uuid,
     pub visibility: String,
     pub member_count: i64,
+    pub theme: String,
+    pub icon: String,
+    pub announcement: Option<String>,
+    pub xp: i64,
     pub created_at: DateTime<Utc>,
 }
 
@@ -144,6 +159,8 @@ mod tests {
             description: Some("Fun games".to_string()),
             is_private: Some(false),
             password: None,
+            theme: None,
+            icon: None,
         };
         assert!(valid_req.validate().is_ok());
 
@@ -152,6 +169,8 @@ mod tests {
             description: None,
             is_private: None,
             password: None,
+            theme: None,
+            icon: None,
         };
         assert!(empty_name_req.validate().is_err());
 
@@ -160,10 +179,9 @@ mod tests {
             description: None,
             is_private: None,
             password: None,
+            theme: None,
+            icon: None,
         };
         assert!(too_long_name.validate().is_err());
     }
 }
-
-
-

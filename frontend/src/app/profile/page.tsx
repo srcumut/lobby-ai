@@ -14,13 +14,24 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { AvatarPicker } from "@/components/avatar/AvatarPicker";
+import { AvatarFrame } from "@/components/avatar/AvatarFrame";
 import { toast } from "@/components/ui/toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queryKeys";
 import { getBannerStyle, getAvatarUrl } from "@/lib/avatar";
 import { UserProfileDialog } from "@/components/profile/UserProfileDialog";
 import { READY_AVATARS, ALL_PROFILE_BADGES, ReadyAvatar, ProfileBadgeItem } from "@/lib/readyAvatars";
-import { playPointSound, playWinSound, playBlipSound } from "@/lib/arcadeSounds";
+import { apiClient } from "@/lib/api/client";
+import { SHOP_ITEMS, ShopItem } from "@/data/shopItems";
+import { 
+  getEquippedCosmetics, 
+  toggleEquippedCosmetic, 
+  getBorderClass, 
+  getTitleBadge, 
+  CosmeticCategory, 
+  EquippedCosmetics 
+} from "@/lib/cosmetics";
+import Link from "next/link";
 import { 
   ShieldCheck, 
   Sparkles, 
@@ -37,7 +48,11 @@ import {
   Lock,
   Star,
   Swords,
-  Users
+  Users,
+  Check,
+  Package,
+  ShoppingBag,
+  Coins
 } from "lucide-react";
 
 // Neo-brutalist cover themes
@@ -60,7 +75,11 @@ export default function ProfilePage() {
   const [statusTagline, setStatusTagline] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [bannerUrl, setBannerUrl] = useState<string | null>("theme:purple");
-  const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
+  const [activeTab, setActiveTab] = useState<"edit" | "preview" | "inventory">("edit");
+  const [inventoryItemIds, setInventoryItemIds] = useState<string[]>([]);
+  const [equippedCosmetics, setEquippedCosmetics] = useState<EquippedCosmetics>({});
+  const [inventoryFilter, setInventoryFilter] = useState<string>("all");
+  const [isLoadingInventory, setIsLoadingInventory] = useState<boolean>(false);
   const [showCardModal, setShowCardModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
@@ -75,13 +94,18 @@ export default function ProfilePage() {
   // Initialize fields
   useEffect(() => {
     if (user) {
-      const parts = (user.display_name || "").trim().split(/\s+/);
-      if (parts.length > 1) {
-        setFirstName(parts[0]);
-        setLastName(parts.slice(1).join(" "));
+      if (user.first_name || user.last_name) {
+        setFirstName(user.first_name || "");
+        setLastName(user.last_name || "");
       } else {
-        setFirstName(user.display_name || "");
-        setLastName("");
+        const parts = (user.display_name || "").trim().split(/\s+/);
+        if (parts.length > 1) {
+          setFirstName(parts[0]);
+          setLastName(parts.slice(1).join(" "));
+        } else {
+          setFirstName(user.display_name || "");
+          setLastName("");
+        }
       }
       setBio(user.bio || "");
       setAvatarUrl(user.avatar_url || null);
@@ -98,6 +122,77 @@ export default function ProfilePage() {
     }
   }, [user, isAuthenticated]);
 
+  // Sync equipped cosmetics and check URL tab param
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tab") === "inventory") {
+        setActiveTab("inventory");
+      }
+    }
+    setEquippedCosmetics(getEquippedCosmetics());
+
+    const handleCosmeticsUpdate = (e: any) => {
+      if (e.detail) {
+        setEquippedCosmetics(e.detail);
+      }
+    };
+    window.addEventListener("lobby:cosmetics_updated", handleCosmeticsUpdate);
+    return () => {
+      window.removeEventListener("lobby:cosmetics_updated", handleCosmeticsUpdate);
+    };
+  }, []);
+
+  const fetchInventory = async () => {
+    setIsLoadingInventory(true);
+    try {
+      const res = await apiClient.get<string[]>("/shop/inventory");
+      if (Array.isArray(res.data)) {
+        setInventoryItemIds(res.data);
+      }
+    } catch (err) {
+      console.error("Failed to load inventory:", err);
+    } finally {
+      setIsLoadingInventory(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user && activeTab === "inventory") {
+      fetchInventory();
+    }
+  }, [user, activeTab]);
+
+  const handleToggleEquip = (item: ShopItem) => {
+    const { equipped, cosmetics } = toggleEquippedCosmetic(
+      item.type as CosmeticCategory,
+      item.id
+    );
+    setEquippedCosmetics(cosmetics);
+    if (equipped) {
+      toast.add({
+        title: "Kuşanıldı! ✨",
+        description: `"${item.name}" başarıyla profilinize ve sohbetlerinize uygulandı.`,
+        type: "success",
+      });
+    } else {
+      toast.add({
+        title: "Kuşanma Kaldırıldı",
+        description: `"${item.name}" aktif kozmetiklerinizden çıkarıldı.`,
+        type: "info",
+      });
+    }
+  };
+
+  const ownedItems = useMemo(() => {
+    return SHOP_ITEMS.filter((item) => inventoryItemIds.includes(item.id));
+  }, [inventoryItemIds]);
+
+  const filteredOwnedItems = useMemo(() => {
+    if (inventoryFilter === "all") return ownedItems;
+    return ownedItems.filter((item) => item.type === inventoryFilter);
+  }, [ownedItems, inventoryFilter]);
+
   const bannerStyle = useMemo(() => getBannerStyle(bannerUrl), [bannerUrl]);
 
   // Featured badge info
@@ -107,15 +202,10 @@ export default function ProfilePage() {
 
   // Handle Ready-Made Avatar Selection
   const handleSelectReadyAvatar = async (avatar: ReadyAvatar) => {
-    playPointSound();
     setIsUploadingAvatar(true);
     try {
-      // Convert SVG Data URI to a File and upload so it persists across all devices
-      const res = await fetch(avatar.dataUri);
-      const blob = await res.blob();
-      const file = new File([blob], `${avatar.id}.svg`, { type: "image/svg+xml" });
-      const updatedUser = await usersApi.uploadAvatar(file);
-      setAvatarUrl(updatedUser.avatar_url || null);
+      const updatedUser = await usersApi.updateProfile({ avatar_url: avatar.path });
+      setAvatarUrl(avatar.path);
 
       const token = localStorage.getItem("access_token");
       if (token) {
@@ -125,34 +215,17 @@ export default function ProfilePage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.auth.me });
       queryClient.invalidateQueries({ queryKey: queryKeys.users.profile(updatedUser.id) });
 
-      playWinSound();
       toast.add({
         title: "Avatar Güncellendi! 🎨",
         description: `"${avatar.name}" hazır avatarınız başarıyla kaydedildi.`,
         type: "success",
       });
-    } catch (err) {
-      // Fallback to updateProfile if upload endpoint has SVG restrictions
-      try {
-        const updatedUser = await usersApi.updateProfile({ avatar_url: avatar.dataUri });
-        setAvatarUrl(avatar.dataUri);
-        const token = localStorage.getItem("access_token");
-        if (token) {
-          login(token, updatedUser);
-        }
-        playWinSound();
-        toast.add({
-          title: "Avatar Güncellendi! 🎨",
-          description: `"${avatar.name}" hazır avatarınız başarıyla kaydedildi.`,
-          type: "success",
-        });
-      } catch (e) {
-        toast.add({
-          title: "Hata",
-          description: "Avatar kaydedilemedi, lütfen tekrar deneyin.",
-          type: "error",
-        });
-      }
+    } catch (err: any) {
+      toast.add({
+        title: "Hata",
+        description: err.response?.data?.error?.message || "Avatar kaydedilemedi, lütfen tekrar deneyin.",
+        type: "error",
+      });
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -295,7 +368,6 @@ export default function ProfilePage() {
   };
 
   const handleSetFeaturedBadge = (badgeId: string) => {
-    playBlipSound();
     setFeaturedBadgeId(badgeId);
     if (user) {
       try {
@@ -321,6 +393,8 @@ export default function ProfilePage() {
     try {
       const updatedUser = await usersApi.updateProfile({
         display_name: combinedName || undefined,
+        first_name: firstName.trim() || undefined,
+        last_name: lastName.trim() || undefined,
         bio: bio.trim() || undefined,
         avatar_url: avatarUrl?.trim() || undefined,
         banner_url: bannerUrl?.trim() || undefined,
@@ -342,7 +416,6 @@ export default function ProfilePage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.auth.me });
       queryClient.invalidateQueries({ queryKey: queryKeys.users.profile(updatedUser.id) });
 
-      playWinSound();
       setMessage({ type: "success", text: "Profil başarıyla kaydedildi!" });
       toast.add({
         title: "Kaydedildi",
@@ -370,11 +443,10 @@ export default function ProfilePage() {
     return ALL_PROFILE_BADGES.filter(b => b.category === badgeFilter);
   }, [badgeFilter]);
 
-  if (!user) return null;
-
   return (
     <ProtectedRoute>
-      <div className="flex-1 w-full max-w-5xl mx-auto py-6 px-4 sm:px-6 space-y-8 animate-fade-in-up">
+      {user && (
+        <div className="flex-1 w-full max-w-5xl mx-auto py-6 px-4 sm:px-6 space-y-8 animate-fade-in-up">
         
         {/* Top Controls: Mode Switcher */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -408,7 +480,18 @@ export default function ProfilePage() {
             </button>
             <button
               type="button"
+              onClick={() => setActiveTab("inventory")}
+              data-testid="profile-tab-inventory"
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-black uppercase transition-all cursor-pointer ${
+                activeTab === "inventory" ? "bg-black text-white shadow-[2px_2px_0_0_rgba(0,0,0,1)]" : "text-black hover:bg-gray-100"
+              }`}
+            >
+              <Package className="w-3.5 h-3.5" /> Envanter & Kozmetikler
+            </button>
+            <button
+              type="button"
               onClick={() => setShowCardModal(true)}
+              data-testid="profile-card-modal-button"
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-black uppercase bg-[#FEF08A] hover:bg-[#FDE047] text-black border-2 border-black transition-all cursor-pointer shadow-[1px_1px_0_0_rgba(0,0,0,1)]"
             >
               <Sparkles className="w-3.5 h-3.5 text-black" /> Profil Kartı
@@ -444,7 +527,7 @@ export default function ProfilePage() {
             {/* Theme Selector / Cover Styling Bar */}
             <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm px-3 py-1.5 brutal-border border-2 shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex items-center gap-2.5 z-10">
               <span className="text-[11px] font-black uppercase flex items-center gap-1 text-black">
-                <Palette className="w-3.5 h-3.5 text-[#FB923C]" /> Tema
+                <Palette className="w-3.5 h-3.5 text-[#06B6D4]" /> Tema
               </span>
               <div className="flex items-center gap-1.5">
                 {COVER_THEMES.map((theme) => {
@@ -495,10 +578,10 @@ export default function ProfilePage() {
 
           {/* Profile Identity Header (Avatar & Badges) */}
           <div className="px-6 pb-6 pt-0 relative">
-            <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 -mt-16 sm:-mt-20 mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 -mt-16 sm:-mt-20 mb-4">
               
-              {/* Avatar Picker / Display */}
-              <div className="relative z-20 flex flex-col items-center sm:items-start">
+              {/* Avatar Picker / Display with Equipped Border & Animation */}
+              <div className="relative z-20 flex flex-col items-start pl-2 sm:pl-3 pt-1">
                 <AvatarPicker
                   currentAvatarUrl={avatarUrl}
                   fallbackText={user.username}
@@ -506,7 +589,8 @@ export default function ProfilePage() {
                   onAvatarChanged={handleAvatarUpload}
                   onAvatarRemoved={avatarUrl ? handleAvatarRemove : undefined}
                   size="lg"
-                  label="Profil Fotoğrafı"
+                  borderId={equippedCosmetics.border}
+                  animationId={equippedCosmetics.avatar_animation}
                   modalTitle="Profil Fotoğrafını Kırp ve Konumlandır"
                 />
               </div>
@@ -528,10 +612,23 @@ export default function ProfilePage() {
 
             {/* User Title, Username & Live Status */}
             <div className="border-b-2 border-black/15 pb-4 space-y-1">
-              <div className="flex items-baseline gap-3 flex-wrap">
+              <div className="flex items-center gap-2.5 flex-wrap">
                 <h2 className="text-3xl font-black text-black">
                   {user.display_name || user.username}
                 </h2>
+                {(() => {
+                  const activeTitle = getTitleBadge(equippedCosmetics.title);
+                  if (!activeTitle) return null;
+                  return (
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 font-black text-xs uppercase ${activeTitle.className}`}
+                      title={`Kuşanılan Ünvan: ${activeTitle.name}`}
+                    >
+                      <span>{activeTitle.icon}</span>
+                      <span>{activeTitle.name}</span>
+                    </span>
+                  );
+                })()}
                 <span className="text-base font-bold text-gray-500">
                   @{user.username}
                 </span>
@@ -557,41 +654,60 @@ export default function ProfilePage() {
               )}
             </div>
 
-            {/* Ready-made Avatars Selector (9 Tarz Avatar) */}
+            {/* Ready-made Avatars Selector (100 Hazır Avatar) */}
             {activeTab === "edit" && (
               <div className="my-6 p-4 bg-[#F4F0E6] border-2 border-black shadow-[3px_3px_0_0_rgba(0,0,0,1)] rounded-sm space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-[#FB923C]" />
-                    Hazır Neo-Brutalist Avatar Koleksiyonu (9 Tarz)
-                  </h3>
-                  <span className="text-[10px] font-bold text-gray-600">
-                    {isUploadingAvatar ? "Kaydediliyor..." : "Tek tıkla avatarını değiştir"}
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-[#06B6D4]" />
+                      Hazır Avatar Koleksiyonu ({READY_AVATARS.length} Avatar)
+                    </h3>
+                    <p className="text-[11px] font-bold text-gray-600 mt-0.5">
+                      Kullanmak istediğin hazır avatarın üzerine tıkla, anında profiline uygulansın.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono font-black bg-white px-2 py-0.5 border border-black shadow-[1px_1px_0_0_#000]">
+                    {isUploadingAvatar ? "Kaydediliyor..." : `${READY_AVATARS.length} Hazır Görsel`}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 sm:grid-cols-9 gap-2.5 pt-1">
-                  {READY_AVATARS.map((ravatar) => (
-                    <button
-                      key={ravatar.id}
-                      type="button"
-                      disabled={isUploadingAvatar}
-                      onClick={() => handleSelectReadyAvatar(ravatar)}
-                      className="group flex flex-col items-center gap-1 p-1.5 bg-white hover:bg-[#FEF08A] border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:-translate-y-1 hover:shadow-[3px_3px_0_0_rgba(0,0,0,1)] transition-all rounded-sm cursor-pointer"
-                      title={`${ravatar.name}: ${ravatar.title}`}
-                    >
-                      <div className="w-12 h-12 rounded-sm border-2 border-black overflow-hidden bg-white group-hover:scale-105 transition-transform">
-                        <img 
-                          src={ravatar.dataUri} 
-                          alt={ravatar.name} 
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <span className="text-[9px] font-black uppercase truncate w-full text-center text-black">
-                        {ravatar.name}
-                      </span>
-                    </button>
-                  ))}
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-3 pt-1 border-t-2 border-black/10">
+                  {READY_AVATARS.map((ravatar) => {
+                    const isSelected = avatarUrl === ravatar.path;
+                    return (
+                      <button
+                        key={ravatar.id}
+                        type="button"
+                        data-testid={`ready-avatar-${ravatar.id}`}
+                        disabled={isUploadingAvatar}
+                        onClick={() => handleSelectReadyAvatar(ravatar)}
+                        className={`group relative flex flex-col items-center gap-1 p-1 bg-white hover:bg-[#FEF08A] border-2 border-black transition-all rounded-sm cursor-pointer ${
+                          isSelected
+                            ? "bg-[#FEF08A] ring-2 ring-emerald-500 shadow-[3px_3px_0_0_#000] -translate-y-0.5"
+                            : "shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:-translate-y-0.5 hover:shadow-[3px_3px_0_0_rgba(0,0,0,1)]"
+                        }`}
+                        title={ravatar.name}
+                      >
+                        <div className="w-12 h-12 rounded-sm border border-black overflow-hidden bg-gray-100 group-hover:scale-105 transition-transform relative">
+                          <img
+                            src={ravatar.path}
+                            alt={ravatar.name}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                          {isSelected && (
+                            <div className="absolute inset-0 bg-emerald-500/30 flex items-center justify-center">
+                              <Check className="w-5 h-5 text-black drop-shadow font-black" />
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-[8px] font-mono font-black uppercase truncate w-full text-center text-black">
+                          #{ravatar.id.replace("avatar-", "")}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -651,7 +767,7 @@ export default function ProfilePage() {
                     onChange={(e) => setStatusTagline(e.target.value)}
                     placeholder="Örn: '🚀 Kod yazıyor', '☕ Kahve molasında', '⚔️ XOX rakibi arıyor...'"
                     maxLength={60}
-                    className="brutal-border bg-white h-11 text-sm font-bold focus-visible:ring-[#FB923C]"
+                    className="brutal-border bg-white h-11 text-sm font-bold focus-visible:ring-[#06B6D4]"
                   />
                   <span className="text-[10px] font-bold text-gray-600 block">
                     Bu durum mesajı profil kartınızda ve lobi odalarında adınızın yanında gözükür.
@@ -746,6 +862,190 @@ export default function ProfilePage() {
                   {isSaving ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
                 </Button>
               </form>
+            )}
+
+            {/* Inventory & Cosmetics Tab */}
+            {activeTab === "inventory" && (
+              <div className="py-6 space-y-6">
+                {/* Inventory Header / Quick Stats */}
+                <div className="p-4 bg-[#FEF08A]/40 border-2 border-black shadow-[3px_3px_0_0_#000] rounded-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-base font-black uppercase text-black flex items-center gap-2">
+                      <Package className="w-5 h-5 text-black" />
+                      Envanter & Sahip Olunan Kozmetikler
+                    </h3>
+                    <p className="text-xs font-bold text-gray-700 mt-0.5">
+                      Mağazadan satın aldığınız tüm eşyalar burada listelenir. Tek tıkla kuşanın veya tarzınızı değiştirin!
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="px-3 py-1.5 bg-white border-2 border-black font-black text-xs flex items-center gap-1.5 shadow-[2px_2px_0_0_#000]">
+                      <Coins className="w-4 h-4 text-amber-600" />
+                      <span>{user.coins ?? 0} Coin</span>
+                    </div>
+                    <Link href="/shop">
+                      <Button
+                        size="sm"
+                        className="bg-[#A78BFA] hover:bg-[#8B5CF6] text-black border-2 border-black font-black text-xs uppercase shadow-[2px_2px_0_0_#000] cursor-pointer"
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5 mr-1" />
+                        Mağazaya Git
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Category Filters */}
+                <div className="flex flex-wrap items-center gap-2 border-b-2 border-black pb-3">
+                  {[
+                    { id: "all", label: "Tümü" },
+                    { id: "global_theme", label: "🌌 Küresel Tema" },
+                    { id: "border", label: "🛡️ Çerçeveler" },
+                    { id: "avatar_animation", label: "✨ Animasyonlar" },
+                    { id: "lobby_theme", label: "💬 Lobi Temaları" },
+                    { id: "dm_theme", label: "✉️ DM Temaları" },
+                    { id: "title", label: "🏷️ Ünvanlar" },
+                    { id: "badge", label: "🪙 Rozetler" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setInventoryFilter(tab.id)}
+                      className={`px-3 py-1.5 border-2 border-black font-black text-xs uppercase transition-all cursor-pointer ${
+                        inventoryFilter === tab.id
+                          ? "bg-black text-white shadow-[2px_2px_0_0_#000] -translate-y-0.5"
+                          : "bg-white text-black hover:bg-gray-100 shadow-[1px_1px_0_0_#000]"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Items Grid or Empty State */}
+                {isLoadingInventory ? (
+                  <div className="p-8 text-center font-black text-gray-500">
+                    Envanter yükleniyor...
+                  </div>
+                ) : filteredOwnedItems.length === 0 ? (
+                  <div className="p-8 bg-white border-2 border-dashed border-black/30 rounded text-center space-y-3">
+                    <div className="text-3xl">🛍️</div>
+                    <h4 className="font-black text-sm uppercase text-black">
+                      {inventoryFilter === "all"
+                        ? "Henüz mağazadan bir eşya satın almadınız!"
+                        : "Bu kategoride henüz sahip olduğunuz bir kozmetik yok."}
+                    </h4>
+                    <p className="text-xs font-bold text-gray-600 max-w-md mx-auto">
+                      Lobi düelloları ve görevlerden kazandığınız coin'lerle mağazamızdan çerçeve, animasyon, ünvan veya galaksi temaları satın alabilirsiniz.
+                    </p>
+                    <Link href="/shop" className="inline-block pt-1">
+                      <Button
+                        size="sm"
+                        className="bg-[#FEF08A] hover:bg-[#FDE047] text-black border-2 border-black font-black text-xs uppercase shadow-[2px_2px_0_0_#000] cursor-pointer"
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5 mr-1" />
+                        Mağazayı Ziyaret Et
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredOwnedItems.map((item) => {
+                      const isEquipped = equippedCosmetics[item.type as keyof EquippedCosmetics] === item.id;
+                      return (
+                        <div
+                          key={item.id}
+                          className={`p-4 bg-white border-3 border-black shadow-[3px_3px_0_0_#000] rounded-sm flex flex-col justify-between space-y-3 transition-all ${
+                            isEquipped ? "ring-2 ring-[#8B5CF6] shadow-[4px_4px_0_0_#8B5CF6]" : ""
+                          }`}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-2xl p-1.5 bg-[#FAF8F0] border-2 border-black shadow-[1.5px_1.5px_0_0_#000]">
+                                {item.icon}
+                              </span>
+                              <span className="text-[10px] font-black uppercase px-2 py-0.5 border border-black bg-gray-100">
+                                {item.type === "border"
+                                  ? "Çerçeve"
+                                  : item.type === "avatar_animation"
+                                  ? "Animasyon"
+                                  : item.type === "title"
+                                  ? "Ünvan"
+                                  : item.type === "global_theme"
+                                  ? "Küresel Tema"
+                                  : item.type === "lobby_theme"
+                                  ? "Lobi Teması"
+                                  : item.type === "dm_theme"
+                                  ? "DM Teması"
+                                  : "Rozet"}
+                              </span>
+                            </div>
+
+                            <h4 className="font-black text-sm uppercase text-black">
+                              {item.name}
+                            </h4>
+
+                            <p className="text-xs font-medium text-gray-700 leading-snug">
+                              {item.description}
+                            </p>
+
+                            {/* Live Visual Preview */}
+                            {item.type === "border" && (
+                              <div className="p-3 bg-[#FAF8F0] border border-dashed border-gray-300 rounded flex items-center justify-center">
+                                <AvatarFrame borderId={item.id} size="sm">
+                                  <div className="w-9 h-9 rounded-full bg-cyan-500 border border-black flex items-center justify-center text-xs text-white font-black">
+                                    🤖
+                                  </div>
+                                </AvatarFrame>
+                              </div>
+                            )}
+
+                            {item.type === "avatar_animation" && (
+                              <div className="p-3 bg-[#FAF8F0] border border-dashed border-gray-300 rounded flex items-center justify-center">
+                                <AvatarFrame animationId={item.id} size="sm">
+                                  <div className="w-9 h-9 rounded-full bg-amber-400 border border-black flex items-center justify-center text-xs text-white font-black">
+                                    ⚡
+                                  </div>
+                                </AvatarFrame>
+                              </div>
+                            )}
+
+                            {item.type !== "border" && item.type !== "avatar_animation" && item.previewClass && (
+                              <div className="p-2 bg-[#FAF8F0] border border-dashed border-gray-300 rounded text-center">
+                                <span className={`px-3 py-1 text-[11px] font-black inline-block ${item.previewClass}`}>
+                                  Önizleme
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="pt-2 border-t border-black/10 flex items-center justify-between">
+                            <span className="text-[10px] font-black text-emerald-700 uppercase flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Envanterinde
+                            </span>
+
+                            {item.type !== "badge" && (
+                              <Button
+                                size="sm"
+                                onClick={() => handleToggleEquip(item)}
+                                data-testid={`inventory-equip-btn-${item.id}`}
+                                className={`font-black text-xs border-2 border-black shadow-[2px_2px_0_0_#000] cursor-pointer py-1 px-3 ${
+                                  isEquipped
+                                    ? "bg-[#A78BFA] hover:bg-[#8B5CF6] text-black"
+                                    : "bg-[#FEF08A] hover:bg-[#FDE047] text-black"
+                                }`}
+                              >
+                                {isEquipped ? "Kuşanıldı ✓" : "Kuşan"}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -865,6 +1165,7 @@ export default function ProfilePage() {
           onClose={() => setShowCardModal(false)}
         />
       </div>
+      )}
     </ProtectedRoute>
   );
 }

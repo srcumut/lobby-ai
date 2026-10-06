@@ -75,6 +75,7 @@ export function AddFriendModal({ isOpen, onClose, onFriendsUpdated }: AddFriendM
     try {
       await friendsApi.rejectRequest(requestId);
       setPendingRequests(prev => prev.filter(r => r.id !== requestId));
+      onFriendsUpdated();
     } catch (err) {
       console.error("Failed to reject request", err);
     }

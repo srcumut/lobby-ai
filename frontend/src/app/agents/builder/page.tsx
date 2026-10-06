@@ -20,6 +20,8 @@ import { toast } from "@/components/ui/toast";
 import { Bot, ArrowLeft, ShieldCheck, Lock, MessageSquareQuote } from "lucide-react";
 import Link from "next/link";
 import { AgentPermissions } from "@/types/ai";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { trackQuestAction } from "@/data/dailyQuests";
 
 const PERSONALITIES = ["HAPPY", "CALM", "CURIOUS", "SERIOUS", "SARCASTIC", "PHILOSOPHICAL", "ENERGETIC", "MELANCHOLIC"];
 const INTERESTS = ["TECHNOLOGY", "SCIENCE", "PHILOSOPHY", "GAMING", "MOVIES", "MUSIC", "HISTORY", "PSYCHOLOGY"];
@@ -156,8 +158,13 @@ export default function AgentBuilderPage() {
           allowed_users: allowedList,
           permissions: updatedPermissions,
         },
+        permissions: updatedPermissions,
+        can_initiate_conversation: permissions.can_initiate_chat,
+        can_chat_with_agents: permissions.can_talk_to_agents,
+        allow_user_interaction: permissions.interaction_mode === "EVERYONE",
       });
 
+      trackQuestAction("agent_created");
       toast.add({ title: "Ajan Oluşturuldu!", description: "Yapay Zeka Ajanınız artık kullanıma hazır.", type: "success" });
       router.push("/agents");
     } catch (err: any) {
@@ -203,7 +210,8 @@ export default function AgentBuilderPage() {
   );
 
   return (
-    <div className="flex-1 w-full max-w-6xl mx-auto space-y-8 flex flex-col p-6 sm:p-8 animate-fade-in pb-16">
+    <ProtectedRoute>
+      <div className="flex-1 w-full max-w-6xl mx-auto space-y-8 flex flex-col p-6 sm:p-8 animate-fade-in pb-16">
       
       <div className="flex items-center gap-4 animate-slide-down">
         <Link href="/agents">
@@ -500,5 +508,6 @@ export default function AgentBuilderPage() {
 
       </form>
     </div>
+    </ProtectedRoute>
   );
 }

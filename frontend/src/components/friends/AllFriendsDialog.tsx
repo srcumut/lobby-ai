@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queryKeys";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +50,7 @@ export function AllFriendsDialog({
   onOpenAddFriend,
 }: AllFriendsDialogProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"friends" | "pending">("friends");
   const [friends, setFriends] = useState<UserInfo[]>([]);
   const [pendingRequests, setPendingRequests] = useState<IncomingFriendRequest[]>([]);
@@ -98,6 +101,8 @@ export function AllFriendsDialog({
         type: "success",
       });
       await loadData();
+      queryClient.invalidateQueries({ queryKey: queryKeys.friends.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.friends.pending });
       onFriendsUpdated();
     } catch (err: any) {
       toast.add({
@@ -120,6 +125,8 @@ export function AllFriendsDialog({
         type: "info",
       });
       await loadData();
+      queryClient.invalidateQueries({ queryKey: queryKeys.friends.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.friends.pending });
       onFriendsUpdated();
     } catch (err: any) {
       toast.add({
@@ -144,6 +151,8 @@ export function AllFriendsDialog({
       });
       setFriendToRemove(null);
       await loadData();
+      queryClient.invalidateQueries({ queryKey: queryKeys.friends.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.friends.pending });
       onFriendsUpdated();
     } catch (err: any) {
       toast.add({

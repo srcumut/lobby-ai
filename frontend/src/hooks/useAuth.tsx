@@ -26,12 +26,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initAuth = async () => {
       const storedToken = localStorage.getItem('access_token');
       const storedRefreshToken = localStorage.getItem('refresh_token');
+      const cachedUser = localStorage.getItem('user');
+
+      if (cachedUser) {
+        try {
+          setUser(JSON.parse(cachedUser));
+        } catch {}
+      }
 
       if (storedToken) {
         setToken(storedToken);
         try {
           const userData = await authApi.getCurrentUser();
           setUser(userData);
+          localStorage.setItem('user', JSON.stringify(userData));
         } catch (error) {
           console.error("Failed to fetch current user, attempting refresh...", error);
           if (storedRefreshToken) {
@@ -97,12 +105,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
     };
 
+    const handleCoinsUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<{ coins: number }>;
+      if (customEvent.detail?.coins !== undefined) {
+        setUser((prev) => {
+          if (!prev) return null;
+          const updated = { ...prev, coins: customEvent.detail.coins };
+          localStorage.setItem('user', JSON.stringify(updated));
+          return updated;
+        });
+      }
+    };
+
     window.addEventListener('auth:token-refreshed', handleTokenRefreshed);
     window.addEventListener('auth:logged-out', handleLoggedOut);
+    window.addEventListener('lobby:coins_updated', handleCoinsUpdated);
 
     return () => {
       window.removeEventListener('auth:token-refreshed', handleTokenRefreshed);
       window.removeEventListener('auth:logged-out', handleLoggedOut);
+      window.removeEventListener('lobby:coins_updated', handleCoinsUpdated);
     };
   }, []);
 

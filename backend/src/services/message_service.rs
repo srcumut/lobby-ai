@@ -1,7 +1,7 @@
 use uuid::Uuid;
 
 use crate::errors::AppError;
-use crate::repositories::{message_repository, user_repository};
+use crate::repositories::{game_repository, message_repository, user_repository};
 use crate::schemas::message::{MessageResponse, MessageSender};
 use crate::state::SharedState;
 
@@ -10,6 +10,10 @@ use crate::state::SharedState;
 const MAX_MESSAGE_LENGTH: usize = 2000;
 const DEFAULT_MESSAGE_LIMIT: i64 = 50;
 const MAX_MESSAGE_LIMIT: i64 = 100;
+
+fn is_reserved_game_result(content: &str) -> bool {
+    ["💣 [BOMBA]", "💥 [BOMBA PATLADI]", "🎭 [DVC SEÇİMİ]", "🎭 [DOĞRULUK]", "🎭 [CESARET]", "🎰 [SLOT]"].iter().any(|prefix| content.starts_with(prefix))
+}
 
 pub async fn create_message(
     state: &SharedState,
@@ -43,11 +47,22 @@ pub async fn create_message(
         }
     }
 
+    let sender = user_repository::find_by_id(&state.db, sender_id)
+        .await?
+        .ok_or_else(|| AppError::Internal("Sender not found".to_string()))?;
+    let game_message = crate::services::game_service::process_command(
+        state, lobby_id, sender_id, &sender.username, trimmed,
+    ).await?;
+    if game_message.is_none() && is_reserved_game_result(trimmed) {
+        return Err(AppError::Validation("Oyun sonuçları yalnızca oyun komutlarıyla oluşturulur.".to_string()));
+    }
     let is_dice = trimmed == "/zar" || trimmed == "/roll";
     let is_coin = trimmed == "/yazitura" || trimmed == "/yazı-tura" || trimmed == "/coin" || trimmed == "/flip";
     let mut rolled_num: u32 = 0;
 
-    let processed_content = if is_dice {
+    let processed_content = if let Some(game) = &game_message {
+        game.content.clone()
+    } else if is_dice {
         let roll = (rand::random::<u32>() % 6) + 1;
         rolled_num = roll;
         let note = if roll == 6 {
@@ -86,6 +101,10 @@ pub async fn create_message(
     let message =
         message_repository::create_message(&state.db, lobby_id, sender_id, &processed_content).await?;
 
+    let game_xp = game_message.as_ref().map_or(0, |game| game.xp);
+    let legacy_game_xp = if is_dice || is_coin || trimmed == "/tkm" { 10 } else { 0 };
+    game_repository::award_xp(&state.db, lobby_id, 1 + game_xp + legacy_game_xp).await?;
+
     if is_dice {
         if rolled_num == 6 {
             let _ = user_repository::unlock_badge(&state.db, sender_id, "lucky_six").await;
@@ -115,10 +134,6 @@ pub async fn create_message(
         let _ = user_repository::unlock_badge(&state.db, sender_id, "first_hello").await;
     }
 
-
-    let sender = user_repository::find_by_id(&state.db, sender_id)
-        .await?
-        .ok_or_else(|| AppError::Internal("Sender not found".to_string()))?;
 
     // --- AI Bot Mention Detection (handles both user and bot mentions with loop protection & permissions) ---
     crate::services::ai_service::handle_agent_mention(
@@ -195,6 +210,7 @@ pub async fn create_message(
         content: message.content,
         is_bot: sender.is_bot,
         created_at: message.created_at,
+        updated_at: message.updated_at,
         reactions: std::collections::HashMap::new(),
     })
 }
@@ -230,6 +246,7 @@ pub async fn get_lobby_messages(
             content: msg.content,
             is_bot: sender.is_bot,
             created_at: msg.created_at,
+            updated_at: msg.updated_at,
             reactions: std::collections::HashMap::new(),
         });
     }
@@ -289,6 +306,155 @@ pub async fn toggle_reaction(
             }
         }
     }
+
+    Ok(())
+}
+
+pub async fn update_message(
+    state: &SharedState,
+    lobby_id: Uuid,
+    message_id: Uuid,
+    user_id: Uuid,
+    content: &str,
+) -> Result<MessageResponse, AppError> {
+    let trimmed = content.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::Validation(
+            "Message content cannot be empty".to_string(),
+        ));
+    }
+    if trimmed.len() > MAX_MESSAGE_LENGTH {
+        return Err(AppError::Validation(format!(
+            "Message content must be at most {MAX_MESSAGE_LENGTH} characters"
+        )));
+    }
+
+    // Check mute
+    if let Some(mute) =
+        crate::repositories::moderation_repository::get_mute(&state.db, lobby_id, user_id).await?
+    {
+        if mute.muted_until.map(|u| u > chrono::Utc::now()).unwrap_or(true) {
+            return Err(AppError::Forbidden(
+                "You are muted in this lobby".to_string(),
+            ));
+        }
+    }
+
+    let existing = message_repository::get_message(&state.db, message_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Message not found".to_string()))?;
+
+    if existing.lobby_id != lobby_id || existing.deleted_at.is_some() {
+        return Err(AppError::NotFound("Message not found in this lobby".to_string()));
+    }
+
+    if existing.sender_id != user_id {
+        return Err(AppError::Forbidden(
+            "You can only edit your own messages".to_string(),
+        ));
+    }
+    if is_reserved_game_result(&existing.content) || is_reserved_game_result(trimmed) {
+        return Err(AppError::Forbidden("Oyun kartları düzenlenemez.".to_string()));
+    }
+
+    let updated = message_repository::update_message(&state.db, message_id, trimmed)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Message not found".to_string()))?;
+
+    let sender = user_repository::find_by_id(&state.db, updated.sender_id)
+        .await?
+        .ok_or_else(|| AppError::Internal("Message sender not found".to_string()))?;
+
+    // Fetch reactions
+    let mut reactions_map: std::collections::HashMap<String, Vec<Uuid>> = std::collections::HashMap::new();
+    let reactions = crate::repositories::reaction_repository::get_reactions_for_message(&state.db, message_id).await?;
+    for r in reactions {
+        reactions_map.entry(r.reaction).or_default().push(r.user_id);
+    }
+
+    let response = MessageResponse {
+        id: updated.id,
+        lobby_id: updated.lobby_id,
+        sender: MessageSender {
+            id: sender.id,
+            username: sender.username,
+            display_name: sender.display_name,
+            avatar_url: sender.avatar_url,
+        },
+        content: updated.content,
+        is_bot: sender.is_bot,
+        created_at: updated.created_at,
+        updated_at: updated.updated_at,
+        reactions: reactions_map,
+    };
+
+    // Broadcast message.updated event
+    state.lobby_manager.broadcast(
+        lobby_id,
+        crate::schemas::ws_event::WsOutgoingEvent {
+            event_type: crate::schemas::ws_event::EVENT_MESSAGE_UPDATED.to_string(),
+            payload: serde_json::to_value(&response).unwrap_or_default(),
+        },
+    ).await;
+
+    Ok(response)
+}
+
+pub async fn delete_message(
+    state: &SharedState,
+    lobby_id: Uuid,
+    message_id: Uuid,
+    user_id: Uuid,
+) -> Result<(), AppError> {
+    let existing = message_repository::get_message(&state.db, message_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Message not found".to_string()))?;
+
+    if existing.lobby_id != lobby_id || existing.deleted_at.is_some() {
+        return Err(AppError::NotFound("Message not found in this lobby".to_string()));
+    }
+
+    // Authorization: author OR lobby owner/moderator/admin
+    let is_author = existing.sender_id == user_id;
+    let mut is_authorized = is_author;
+
+    if !is_authorized {
+        let lobby = crate::repositories::lobby_repository::find_by_id(&state.db, lobby_id).await?;
+        if let Some(lobby) = lobby {
+            if lobby.owner_id == user_id {
+                is_authorized = true;
+            }
+        }
+    }
+
+    if !is_authorized {
+        if let Some(role) = crate::repositories::lobby_repository::get_member_role(&state.db, lobby_id, user_id).await? {
+            let role_lower = role.to_lowercase();
+            if role_lower == "owner" || role_lower == "admin" || role_lower == "moderator" {
+                is_authorized = true;
+            }
+        }
+    }
+
+    if !is_authorized {
+        return Err(AppError::Forbidden(
+            "You do not have permission to delete this message".to_string(),
+        ));
+    }
+
+    message_repository::soft_delete_message(&state.db, message_id).await?;
+
+    // Broadcast message.deleted event
+    state.lobby_manager.broadcast(
+        lobby_id,
+        crate::schemas::ws_event::WsOutgoingEvent {
+            event_type: crate::schemas::ws_event::EVENT_MESSAGE_DELETED.to_string(),
+            payload: serde_json::json!({
+                "message_id": message_id,
+                "lobby_id": lobby_id,
+            }),
+        },
+    ).await;
 
     Ok(())
 }

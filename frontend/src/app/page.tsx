@@ -125,7 +125,7 @@ export default function MainPage() {
               <div className="space-y-1">
                 <h1 className="text-3xl sm:text-4xl md:text-5xl font-black uppercase tracking-tight text-black flex items-center gap-3 flex-wrap">
                   Hoş Geldin,
-                  <span className="bg-[#FB923C] text-black px-3 py-0.5 border-3 border-black shadow-[3px_3px_0_0_#000] inline-block">
+                  <span className="bg-[#06B6D4] text-black px-3 py-0.5 border-3 border-black shadow-[3px_3px_0_0_#000] inline-block">
                     {user?.display_name || user?.username}!
                   </span>
                 </h1>
@@ -156,7 +156,7 @@ export default function MainPage() {
                 </Link>
 
                 <span className="bg-white text-black px-3 py-1.5 border-2 border-black font-black text-xs uppercase flex items-center gap-1.5 shadow-[2px_2px_0_0_#000]">
-                  <Crown className="w-3.5 h-3.5 text-[#FB923C]" />
+                  <Crown className="w-3.5 h-3.5 text-[#06B6D4]" />
                   <span>{publicLobbies.length} Aktif Lobi</span>
                 </span>
 
@@ -189,7 +189,7 @@ export default function MainPage() {
               <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                 <Button 
                   size="default" 
-                  className="flex-1 sm:flex-none bg-[#FB923C] hover:bg-[#EA580C] text-black font-black text-xs uppercase h-11 px-5 border-2 border-black shadow-[3px_3px_0_0_#000] hover:-translate-y-0.5 transition-all cursor-pointer"
+                  className="flex-1 sm:flex-none bg-[#06B6D4] hover:bg-[#0891B2] text-black font-black text-xs uppercase h-11 px-5 border-2 border-black shadow-[3px_3px_0_0_#000] hover:-translate-y-0.5 transition-all cursor-pointer"
                   onClick={() => router.push("/lobbies")}
                 >
                   Lobilere Göz At
@@ -276,10 +276,10 @@ export default function MainPage() {
             <section className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-2xl font-black uppercase tracking-tight flex items-center gap-2">
-                  <span className="bg-[#FB923C] p-1.5 rounded-sm border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-black"><Crown className="w-5 h-5" /></span> 
+                  <span className="bg-[#06B6D4] p-1.5 rounded-sm border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-black"><Crown className="w-5 h-5" /></span> 
                   Herkese Açık Odalar
                 </h3>
-                <Link href="/lobbies" className="font-bold underline underline-offset-4 hover:text-[#FB923C] transition-colors cursor-pointer">
+                <Link href="/lobbies" className="font-bold underline underline-offset-4 hover:text-[#06B6D4] transition-colors cursor-pointer">
                   Tümünü Gör
                 </Link>
               </div>
@@ -291,8 +291,8 @@ export default function MainPage() {
               ) : publicLobbies.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {publicLobbies.slice(0, 4).map((lobby, index) => {
-                    const topBarColors = ["bg-[#FB923C]", "bg-[#F472B6]", "bg-[#FEF08A]", "bg-[#F97316]"];
-                    const badgeBgColors = ["bg-[#FFEDD5]", "bg-[#FCE7F3]", "bg-[#FEF9C3]", "bg-[#FFEDD5]"];
+                    const topBarColors = ["bg-[#06B6D4]", "bg-[#8B5CF6]", "bg-[#10B981]", "bg-[#FEF08A]"];
+                    const badgeBgColors = ["bg-[#CFFAFE]", "bg-[#EDE9FE]", "bg-[#DCFCE7]", "bg-[#FEF9C3]"];
                     const accentColor = topBarColors[index % topBarColors.length];
                     const badgeColor = badgeBgColors[index % badgeBgColors.length];
                     return (
@@ -303,13 +303,18 @@ export default function MainPage() {
                         style={{ animationDelay: `${index * 120}ms` }}
                       >
                         {/* Full card linear sweep animation */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-[#FEF08A]/30 via-[#FB923C]/20 to-[#F472B6]/30 scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300 pointer-events-none z-0" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-[#06B6D4]/20 via-[#FEF08A]/20 to-[#8B5CF6]/20 scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300 pointer-events-none z-0" />
 
                         {/* Top linear accent indicator */}
                         <div className={`absolute top-0 left-0 right-0 h-1.5 ${accentColor} scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-200 z-10`} />
 
                         <CardHeader className="pb-2 relative z-10">
-                          <CardTitle className="text-lg font-black line-clamp-1">{lobby.name}</CardTitle>
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-xs bg-[#F4F0E6] border border-black flex items-center justify-center text-xs shadow-[1px_1px_0_0_#000] shrink-0">
+                              {lobby.icon || "💬"}
+                            </span>
+                            <CardTitle className="text-lg font-black line-clamp-1">{lobby.name}</CardTitle>
+                          </div>
                           <CardDescription className="font-bold text-black/70 line-clamp-2 text-sm mt-1">
                             {lobby.description || "Açıklama belirtilmemiş"}
                           </CardDescription>
@@ -388,7 +393,7 @@ export default function MainPage() {
                 <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
                   <Bot className="w-5 h-5 text-[#F472B6]" /> Ajanların
                 </h3>
-                <Link href="/agents" className="font-bold underline underline-offset-4 text-sm hover:text-[#FB923C] transition-colors cursor-pointer">
+                <Link href="/agents" className="font-bold underline underline-offset-4 text-sm hover:text-[#06B6D4] transition-colors cursor-pointer">
                   Yönet
                 </Link>
               </div>
@@ -398,7 +403,7 @@ export default function MainPage() {
                   <div className="text-sm font-bold text-gray-500">Ajanlar yükleniyor...</div>
                 ) : agents.length > 0 ? (
                   agents.slice(0, 3).map((agent, i) => {
-                    const badgeBgs = ["bg-[#F472B6]", "bg-[#FB923C]", "bg-[#FEF08A]"];
+                    const badgeBgs = ["bg-[#F472B6]", "bg-[#06B6D4]", "bg-[#FEF08A]"];
                     const badgeBg = badgeBgs[i % badgeBgs.length];
                     return (
                       <div key={agent.id} onClick={() => router.push("/agents")} className="bg-white p-3 border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] flex justify-between items-center hover:-translate-y-0.5 hover:shadow-[3px_3px_0_0_rgba(0,0,0,1)] transition-all group cursor-pointer rounded-sm">
@@ -416,7 +421,7 @@ export default function MainPage() {
                 ) : (
                   <div className="bg-[#FEF9C3] p-4 border-2 border-black shadow-[3px_3px_0_0_rgba(0,0,0,1)] rounded-sm">
                     <p className="font-bold text-sm text-black mb-3">Henüz aktif bir yapay zeka ajanı oluşturmadınız.</p>
-                    <Button className="w-full font-black bg-[#FB923C] text-black hover:bg-[#F97316] border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] uppercase text-xs h-8 cursor-pointer" onClick={() => router.push("/agents")}>
+                    <Button className="w-full font-black bg-[#06B6D4] text-black hover:bg-[#0891B2] border-2 border-black shadow-[2px_2px_0_0_rgba(0,0,0,1)] uppercase text-xs h-8 cursor-pointer" onClick={() => router.push("/agents")}>
                       Bir Tane Oluştur
                     </Button>
                   </div>
@@ -446,7 +451,7 @@ export default function MainPage() {
       <div className="absolute top-0 right-0 lg:right-10 w-full max-w-sm hidden md:block opacity-20 pointer-events-none z-0">
         <div className="bg-white brutal-border brutal-shadow flex flex-col h-32 w-full transform rotate-3">
           <div className="border-b-[3px] border-black bg-[#FEF08A] p-2 flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-[#FB923C]"></div>
+            <div className="w-3 h-3 rounded-full bg-[#06B6D4]"></div>
             <div className="w-3 h-3 rounded-full bg-[#F472B6]"></div>
             <div className="w-3 h-3 rounded-full bg-black"></div>
           </div>
@@ -460,7 +465,7 @@ export default function MainPage() {
       
       <div className="text-center space-y-4 relative z-10 w-full mt-6 animate-fade-in-up flex flex-col items-center">
         <div className="flex -space-x-2 md:-space-x-4 cursor-default">
-          <div className="bg-[#FB923C] border-[4px] border-black px-4 md:px-6 py-2 transform -rotate-3 z-10 shadow-[4px_4px_0_rgba(0,0,0,1)] md:shadow-[6px_6px_0_rgba(0,0,0,1)]">
+          <div className="bg-[#06B6D4] border-[4px] border-black px-4 md:px-6 py-2 transform -rotate-3 z-10 shadow-[4px_4px_0_rgba(0,0,0,1)] md:shadow-[6px_6px_0_rgba(0,0,0,1)]">
             <span className="font-black text-5xl md:text-8xl tracking-tighter uppercase text-black">LOBBY</span>
           </div>
           <div className="bg-[#FEF08A] border-[4px] border-black px-4 md:px-6 py-2 transform rotate-3 z-0 shadow-[4px_4px_0_rgba(0,0,0,1)] md:shadow-[6px_6px_0_rgba(0,0,0,1)]">
@@ -481,7 +486,7 @@ export default function MainPage() {
 
       <div className="flex flex-col sm:flex-row gap-4 mt-6 z-10 animate-pop-in delay-400">
         <Link href="/register">
-          <Button size="lg" className="h-16 px-10 text-xl font-black bg-[#FB923C] text-black hover:bg-[#F97316] brutal-shadow shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:translate-x-1 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all uppercase cursor-pointer">
+          <Button size="lg" className="h-16 px-10 text-xl font-black bg-[#06B6D4] text-black hover:bg-[#0891B2] brutal-shadow shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 hover:translate-x-1 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all uppercase cursor-pointer">
             Sohbete Başla
           </Button>
         </Link>
@@ -497,7 +502,7 @@ export default function MainPage() {
         <FeatureSlider />
       </div>
 
-      {/* Feature Grid Mini: Yellow, Orange, Pink */}
+      {/* Feature Grid Mini: Yellow, Cyan, Pink */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full pt-4 z-10">
         <div className="bg-white p-4 brutal-border shadow-[4px_4px_0_0_rgba(0,0,0,1)] transition-transform hover:-translate-y-1 animate-fade-in-up delay-200">
           <div className="w-10 h-10 bg-[#FEF08A] brutal-border flex items-center justify-center text-xl mb-3 font-black">1</div>
@@ -505,7 +510,7 @@ export default function MainPage() {
           <p className="font-medium text-xs text-gray-700">Genel sohbetlere katılın ya da odanızı güvenli bir şifreyle kilitleyerek özel oturumlar başlatın.</p>
         </div>
         <div className="bg-white p-4 brutal-border shadow-[4px_4px_0_0_rgba(0,0,0,1)] transition-transform hover:-translate-y-1 animate-fade-in-up delay-300">
-          <div className="w-10 h-10 bg-[#FB923C] brutal-border flex items-center justify-center text-xl mb-3 font-black">2</div>
+          <div className="w-10 h-10 bg-[#06B6D4] brutal-border flex items-center justify-center text-xl mb-3 font-black">2</div>
           <h3 className="text-lg font-black uppercase mb-1">Gerçek Zamanlı Senkronizasyon</h3>
           <p className="font-medium text-xs text-gray-700">Rust ve WebSocket altyapısıyla güçlendirildi. Işık hızında, ultra düşük gecikmeli iletişimi deneyimleyin.</p>
         </div>

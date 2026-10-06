@@ -19,6 +19,7 @@ import { toast } from "@/components/ui/toast";
 import { Bot, ArrowLeft, ShieldCheck, Lock, MessageSquareQuote } from "lucide-react";
 import Link from "next/link";
 import { AgentPermissions } from "@/types/ai";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 const PERSONALITIES = ["HAPPY", "CALM", "CURIOUS", "SERIOUS", "SARCASTIC", "PHILOSOPHICAL", "ENERGETIC", "MELANCHOLIC"];
 const INTERESTS = ["TECHNOLOGY", "SCIENCE", "PHILOSOPHY", "GAMING", "MOVIES", "MUSIC", "HISTORY", "PSYCHOLOGY"];
@@ -76,6 +77,7 @@ export default function AgentEditPage() {
     name: "",
     provider: "OpenAI",
     model: "gpt-4o",
+    public_bio: "",
     custom_instructions: ""
   });
 
@@ -105,6 +107,7 @@ export default function AgentEditPage() {
           name: agent.name,
           provider: agent.provider,
           model: agent.model,
+          public_bio: agent.public_bio || "",
           custom_instructions: agent.custom_instructions || ""
         });
         
@@ -122,10 +125,25 @@ export default function AgentEditPage() {
         const allowed = rawBehavior?.permissions?.allowed_users || rawBehavior?.allowed_users || [];
         const mode = rawBehavior?.interaction_mode || rawBehavior?.permissions?.interaction_mode || (allowed.length > 0 ? "WHITELIST" : (agent as any).allow_user_interaction !== false ? "EVERYONE" : "OWNER_ONLY");
 
+        const canInitiate = Boolean(
+          agent.can_initiate_conversation ??
+          rawBehavior?.permissions?.can_initiate_chat ??
+          agent.permissions?.can_initiate_chat ??
+          false
+        );
+        const canTalk = Boolean(
+          agent.can_chat_with_agents ??
+          rawBehavior?.permissions?.can_talk_to_agents ??
+          agent.permissions?.can_talk_to_agents ??
+          false
+        );
+        const isPublicAllowed = (agent.allow_user_interaction !== false) &&
+          (rawBehavior?.permissions?.allow_public_usage !== false);
+
         setPermissions({
-          can_initiate_chat: Boolean(rawBehavior?.permissions?.can_initiate_chat ?? agent.permissions?.can_initiate_chat),
-          can_talk_to_agents: Boolean(rawBehavior?.permissions?.can_talk_to_agents ?? agent.permissions?.can_talk_to_agents),
-          allow_public_usage: mode === "EVERYONE",
+          can_initiate_chat: canInitiate,
+          can_talk_to_agents: canTalk,
+          allow_public_usage: mode === "EVERYONE" && isPublicAllowed,
           interaction_mode: mode,
           allowed_users: allowed,
         });
@@ -219,6 +237,7 @@ export default function AgentEditPage() {
         provider: formData.provider,
         model: formData.model,
         avatar_url: avatarUrl || undefined,
+        public_bio: formData.public_bio.trim() || undefined,
         personality_config: selections.personality,
         interest_config: selections.interest,
         communication_config: selections.communication,
@@ -229,6 +248,8 @@ export default function AgentEditPage() {
           permissions: updatedPermissions,
         },
         permissions: updatedPermissions,
+        can_initiate_conversation: permissions.can_initiate_chat,
+        can_chat_with_agents: permissions.can_talk_to_agents,
         allow_user_interaction: permissions.interaction_mode === "EVERYONE",
         custom_instructions: formData.custom_instructions,
       });
@@ -262,16 +283,14 @@ export default function AgentEditPage() {
     </div>
   );
 
-  if (isFetching) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-xl font-bold animate-pulse">Ajan Yapılandırması Yükleniyor...</div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex-1 w-full max-w-4xl mx-auto space-y-8 flex flex-col p-6 sm:p-8 animate-fade-in pb-16">
+    <ProtectedRoute>
+      {isFetching ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-xl font-bold animate-pulse">Ajan Yapılandırması Yükleniyor...</div>
+        </div>
+      ) : (
+        <div className="flex-1 w-full max-w-4xl mx-auto space-y-8 flex flex-col p-6 sm:p-8 animate-fade-in pb-16">
       
       <div className="flex items-center gap-4 animate-slide-down">
         <Link href="/agents">
@@ -324,6 +343,19 @@ export default function AgentEditPage() {
                   onChange={e => setFormData({...formData, name: e.target.value})}
                   autoComplete="off"
                   className="bg-white brutal-border border-2 shadow-[4px_4px_0_0_rgba(0,0,0,1)] font-bold text-lg"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="font-black uppercase flex items-center justify-between">
+                  <span>Ajan Açıklaması & Tanıtımı (Public Bio)</span>
+                  <span className="text-[11px] font-bold text-black/60 lowercase font-mono">profil ve lobi görünümü</span>
+                </Label>
+                <Textarea 
+                  placeholder="Örn: Bu ajan kodlama, sistem mimarisi ve hata ayıklama konularında uzman bir asistandır..." 
+                  value={formData.public_bio}
+                  onChange={e => setFormData({...formData, public_bio: e.target.value})}
+                  className="bg-white brutal-border border-2 shadow-[4px_4px_0_0_rgba(0,0,0,1)] font-bold text-sm min-h-[72px]"
                 />
               </div>
             </div>
@@ -544,5 +576,7 @@ export default function AgentEditPage() {
 
       </form>
     </div>
+      )}
+    </ProtectedRoute>
   );
 }

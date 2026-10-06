@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { LobbyMember } from "@/types";
 import { MemberContextMenu } from "./MemberContextMenu";
 import { getAvatarUrl } from "@/lib/avatar";
+import { LobbyThemeStyles } from "@/lib/cosmetics";
 
 interface MembersListProps {
   members: LobbyMember[];
@@ -21,6 +22,7 @@ interface MembersListProps {
   isLobbyOwner?: boolean;
   onActionSuccess?: () => void;
   onChallengeRps?: (targetId: string, targetUsername: string, isBot?: boolean) => void;
+  themeStyles?: LobbyThemeStyles;
 }
 
 export function MembersList({ 
@@ -33,6 +35,7 @@ export function MembersList({
   isLobbyOwner = false,
   onActionSuccess,
   onChallengeRps,
+  themeStyles,
 }: MembersListProps) {
 
   const humans = members.filter(m => !m.is_bot);
@@ -61,9 +64,9 @@ export function MembersList({
   };
 
   return (
-    <aside className="w-64 bg-white border-l-4 border-black shrink-0 hidden lg:flex flex-col h-full brutal-shadow z-10">
-      <div className="p-4 border-b-4 border-black bg-[#FEF08A] shrink-0">
-        <h3 className="font-black text-lg uppercase flex items-center gap-2">
+    <aside className={`w-64 ${themeStyles?.membersBodyClass || "bg-white text-black"} border-l-4 border-black shrink-0 hidden lg:flex flex-col h-full brutal-shadow z-10 transition-colors`}>
+      <div className={`p-4 border-b-4 border-black ${themeStyles?.membersHeaderClass || "bg-[#FEF08A] text-black"} shrink-0 transition-colors`}>
+        <h3 className="font-black text-lg uppercase flex items-center gap-2 text-inherit">
           <Users className="w-5 h-5" /> Üyeler — {members.length}
         </h3>
       </div>
@@ -72,9 +75,9 @@ export function MembersList({
         
         {/* Humans Section */}
         <div>
-          <h4 className="text-xs font-black uppercase text-gray-500 mb-3 tracking-wider flex items-center justify-between">
+          <h4 className={`text-xs font-black uppercase mb-3 tracking-wider flex items-center justify-between ${themeStyles?.membersTextSecondary || "text-gray-500"}`}>
             <span>Çevrimiçi Kullanıcılar</span>
-            <span className="bg-gray-100 px-1.5 py-0.5 border border-black text-[10px]">{humans.length}</span>
+            <span className="bg-black/10 dark:bg-white/10 px-1.5 py-0.5 border border-black/40 text-[10px] font-black text-inherit">{humans.length}</span>
           </h4>
           <div className="space-y-1.5">
             {humans.map(human => {
@@ -83,7 +86,7 @@ export function MembersList({
               return (
                 <div 
                   key={human.user_id}
-                  className="flex items-center justify-between p-1.5 rounded-sm hover:bg-gray-100 transition-colors border-2 border-transparent hover:border-black hover:shadow-[2px_2px_0_0_rgba(0,0,0,1)] group"
+                  className={`flex items-center justify-between p-1.5 rounded-sm ${themeStyles?.membersItemHoverClass || "hover:bg-gray-100"} transition-colors border-2 border-transparent hover:border-black hover:shadow-[2px_2px_0_0_rgba(0,0,0,1)] group`}
                 >
                   <div 
                     className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer pr-1"
@@ -103,7 +106,7 @@ export function MembersList({
                     </div>
                     <div className="flex flex-col min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-sm truncate" title={human.username}>
+                        <span className={`font-bold text-sm truncate ${themeStyles?.membersTextPrimary || "text-black"}`} title={human.username}>
                           {human.username}
                         </span>
                         {isSelf && <span className="text-[10px] text-gray-400 font-bold">(Sen)</span>}
@@ -132,15 +135,15 @@ export function MembersList({
         {/* Bots Section */}
         {bots.length > 0 && (
           <div>
-            <h4 className="text-xs font-black uppercase text-gray-500 mb-3 tracking-wider flex items-center justify-between">
+            <h4 className={`text-xs font-black uppercase mb-3 tracking-wider flex items-center justify-between ${themeStyles?.membersTextSecondary || "text-gray-500"}`}>
               <span className="flex items-center gap-1">Aktif Ajanlar</span>
-              <span className="bg-gray-100 px-1.5 py-0.5 border border-black text-[10px]">{bots.length}</span>
+              <span className="bg-black/10 dark:bg-white/10 px-1.5 py-0.5 border border-black/40 text-[10px] font-black text-inherit">{bots.length}</span>
             </h4>
             <div className="space-y-1.5">
               {bots.map(bot => (
                 <div 
                   key={bot.user_id}
-                  className="flex items-center justify-between p-1.5 rounded-sm hover:bg-gray-100 transition-colors border-2 border-transparent hover:border-black hover:shadow-[2px_2px_0_0_rgba(0,0,0,1)] group"
+                  className={`flex items-center justify-between p-1.5 rounded-sm ${themeStyles?.membersItemHoverClass || "hover:bg-gray-100"} transition-colors border-2 border-transparent hover:border-black hover:shadow-[2px_2px_0_0_rgba(0,0,0,1)] group`}
                 >
                   <div 
                     className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer pr-1"
@@ -159,7 +162,7 @@ export function MembersList({
                       )}
                     </div>
                     <div className="flex flex-col min-w-0">
-                      <span className="font-bold text-sm truncate" title={bot.username}>
+                      <span className={`font-bold text-sm truncate ${themeStyles?.membersTextPrimary || "text-black"}`} title={bot.username}>
                         {bot.username}
                       </span>
                       <Badge className="bg-black text-white text-[9px] w-fit px-1 py-0 h-4 mt-0.5">

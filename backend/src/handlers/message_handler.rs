@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::errors::AppError;
 use crate::middleware::auth_middleware::AuthenticatedUser;
 use crate::repositories::lobby_repository;
-use crate::schemas::message::{CreateMessageRequest, MessageQuery, MessageResponse};
+use crate::schemas::message::{CreateMessageRequest, MessageQuery, MessageResponse, UpdateMessageRequest};
 use crate::services::message_service;
 use crate::state::SharedState;
 
@@ -69,4 +69,47 @@ pub async fn toggle_reaction(
     message_service::toggle_reaction(&state, lobby_id, message_id, auth.user_id, &request.reaction).await?;
 
     Ok(Json(serde_json::json!({ "message": "Reaction updated" })))
+}
+
+pub async fn update_message(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    Path((lobby_id, message_id)): Path<(Uuid, Uuid)>,
+    Json(request): Json<UpdateMessageRequest>,
+) -> Result<Json<MessageResponse>, AppError> {
+    use validator::Validate;
+    request.validate().map_err(|e| AppError::Validation(e.to_string()))?;
+
+    if !lobby_repository::is_member(&state.db, lobby_id, auth.user_id).await? {
+        return Err(AppError::Forbidden(
+            "You must be a member of this lobby to edit messages".to_string(),
+        ));
+    }
+
+    let message = message_service::update_message(
+        &state,
+        lobby_id,
+        message_id,
+        auth.user_id,
+        &request.content,
+    )
+    .await?;
+
+    Ok(Json(message))
+}
+
+pub async fn delete_message(
+    State(state): State<SharedState>,
+    auth: AuthenticatedUser,
+    Path((lobby_id, message_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<serde_json::Value>, AppError> {
+    if !lobby_repository::is_member(&state.db, lobby_id, auth.user_id).await? {
+        return Err(AppError::Forbidden(
+            "You must be a member of this lobby to delete messages".to_string(),
+        ));
+    }
+
+    message_service::delete_message(&state, lobby_id, message_id, auth.user_id).await?;
+
+    Ok(Json(serde_json::json!({ "message": "Message deleted successfully" })))
 }

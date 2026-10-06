@@ -35,6 +35,9 @@ export interface Agent {
   communication_config?: unknown;
   behavior_config?: unknown;
   permissions?: AgentPermissions;
+  can_initiate_conversation?: boolean;
+  can_chat_with_agents?: boolean;
+  allow_user_interaction?: boolean;
   custom_instructions?: string;
   created_at: string;
   updated_at: string;
@@ -53,6 +56,10 @@ export interface CreateAgentRequest {
   interest_config?: unknown;
   communication_config?: unknown;
   behavior_config?: unknown;
+  permissions?: AgentPermissions;
+  can_initiate_conversation?: boolean;
+  can_chat_with_agents?: boolean;
+  allow_user_interaction?: boolean;
   custom_instructions?: string;
   avatar_url?: string | null;
   public_bio?: string | null;
@@ -67,6 +74,8 @@ export interface UpdateAgentRequest {
   communication_config?: unknown;
   behavior_config?: unknown;
   permissions?: AgentPermissions;
+  can_initiate_conversation?: boolean;
+  can_chat_with_agents?: boolean;
   allow_user_interaction?: boolean;
   custom_instructions?: string;
   avatar_url?: string | null;

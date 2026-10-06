@@ -3,6 +3,8 @@ export interface UserInfo {
   username: string;
   email: string;
   display_name: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   avatar_url: string | null;
   bio: string | null;
   banner_url?: string | null;
@@ -26,6 +28,10 @@ export interface Lobby {
   owner_id: string;
   visibility: string;
   member_count: number;
+  theme?: string;
+  icon?: string;
+  announcement?: string | null;
+  xp: number;
   created_at: string;
 }
 
@@ -62,6 +68,8 @@ export interface PublicUserProfile {
   id: string;
   username: string;
   display_name: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   avatar_url: string | null;
   bio: string | null;
   banner_url?: string | null;

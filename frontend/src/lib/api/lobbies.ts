@@ -36,6 +36,7 @@ export interface MessageResponse {
   content: string;
   is_bot: boolean;
   created_at: string;
+  updated_at?: string;
 }
 
 export const lobbiesApi = {
@@ -84,8 +85,15 @@ export const lobbiesApi = {
     await apiClient.post(`/lobbies/${lobbyId}/moderation/${action}/${userId}`, data);
   },
 
-  updateLobby: async (id: string, name?: string, description?: string): Promise<Lobby> => {
-    const response = await apiClient.put<Lobby>(`/lobbies/${id}`, { name, description });
+  updateLobby: async (
+    id: string, 
+    payload: { name?: string; description?: string; theme?: string; icon?: string; announcement?: string | null } | string,
+    legacyDescription?: string
+  ): Promise<Lobby> => {
+    const data = typeof payload === "string" 
+      ? { name: payload, description: legacyDescription }
+      : payload;
+    const response = await apiClient.put<Lobby>(`/lobbies/${id}`, data);
     return response.data;
   },
 
@@ -131,6 +139,20 @@ export const lobbiesApi = {
 
   sendMessage: async (id: string, content: string): Promise<MessageResponse> => {
     const response = await apiClient.post<MessageResponse>(`/lobbies/${id}/messages`, { content });
+    return response.data;
+  },
+
+  updateMessage: async (lobbyId: string, messageId: string, content: string): Promise<MessageResponse> => {
+    const response = await apiClient.put<MessageResponse>(`/lobbies/${lobbyId}/messages/${messageId}`, { content });
+    return response.data;
+  },
+
+  deleteMessage: async (lobbyId: string, messageId: string): Promise<void> => {
+    await apiClient.delete(`/lobbies/${lobbyId}/messages/${messageId}`);
+  },
+
+  initiateAgentChat: async (lobbyId: string, agentId: string): Promise<MessageResponse> => {
+    const response = await apiClient.post<MessageResponse>(`/lobbies/${lobbyId}/agents/${agentId}/initiate`);
     return response.data;
   },
 };

@@ -24,6 +24,7 @@ import { toast } from "@/components/ui/toast";
 import { friendsApi } from "@/lib/api/friends";
 import { lobbiesApi } from "@/lib/api/lobbies";
 import { Lobby, UserInfo } from "@/types";
+import { getEquippedCosmetics, getDmThemeStyles, setEquippedCosmetic } from "@/lib/cosmetics";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +49,7 @@ import {
   BellOff,
   Share2,
   Sparkles,
+  Palette,
   ChevronRight,
   Users,
   Pin,
@@ -55,10 +57,15 @@ import {
   ChevronDown,
   ExternalLink,
   DoorOpen,
-  Plus
+  Download,
+  Dices,
 } from "lucide-react";
 
 const EMOJI_REACTIONS = ["👍", "❤️", "🔥", "😂", "🎉", "🚀"];
+const EMOJI_CATEGORIES: Record<string, string[]> = {
+  "Popüler": ["😊", "😂", "🔥", "🚀", "✨", "❤️", "🎉", "👍", "💯", "💪", "👀", "🙌"],
+  "Oyun & Sosyal": ["🎮", "👾", "🎲", "🏆", "☕", "🍕", "⚡", "💬", "🤖", "🛡️", "🎯", "💎"]
+};
 const CONVERSATION_STARTERS = [
   "👋 Merhaba, nasılsın?",
   "🎮 Müsait misin, lobiye geçelim mi?",
@@ -113,16 +120,44 @@ function MessagesContent() {
     }
   });
 
+  const [equippedDmTheme, setEquippedDmTheme] = useState<string | null>(null);
+
+  useEffect(() => {
+    const cosmetics = getEquippedCosmetics();
+    setEquippedDmTheme(cosmetics.dm_theme || null);
+
+    const handleCosmeticsUpdate = (e: any) => {
+      setEquippedDmTheme(e.detail?.dm_theme || null);
+    };
+
+    window.addEventListener("lobby:cosmetics_updated", handleCosmeticsUpdate);
+    return () => window.removeEventListener("lobby:cosmetics_updated", handleCosmeticsUpdate);
+  }, []);
+
+  const dmChatTheme = getDmThemeStyles(equippedDmTheme);
+
   // Lobby Invite Modal state
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [availableLobbies, setAvailableLobbies] = useState<Lobby[]>([]);
   const [isLoadingLobbies, setIsLoadingLobbies] = useState(false);
 
-  // In-chat interactive search & drawer
   const [showInfoDrawer, setShowInfoDrawer] = useState(false);
   const [chatSearchOpen, setChatSearchOpen] = useState(false);
   const [chatSearchQuery, setChatSearchQuery] = useState("");
   const [isMuted, setIsMuted] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [dmThemeModalOpen, setDmThemeModalOpen] = useState(false);
+
+  const handleSwitchDmTheme = (themeId: string | null) => {
+    setEquippedCosmetic("dm_theme", themeId);
+    setEquippedDmTheme(themeId);
+    toast.add({
+      title: "DM Teması Değiştirildi ✨",
+      description: "Özel mesajlaşma pencereniz anında seçtiğiniz temaya uyarlandı.",
+      type: "success",
+    });
+    setDmThemeModalOpen(false);
+  };
 
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
@@ -194,6 +229,91 @@ function MessagesContent() {
     const val = e.target.value;
     setInputMessage(val);
     sendTyping(val.trim().length > 0);
+  };
+
+  const isDifferentDay = (d1: string, d2?: string) => {
+    if (!d2) return true;
+    const date1 = new Date(d1).toDateString();
+    const date2 = new Date(d2).toDateString();
+    return date1 !== date2;
+  };
+
+  const formatDateDivider = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const today = new Date().toDateString();
+    const yesterday = new Date(Date.now() - 86400000).toDateString();
+    if (d.toDateString() === today) return "Bugün";
+    if (d.toDateString() === yesterday) return "Dün";
+    return d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
+  };
+
+  const renderHighlightedText = (content: string, query: string) => {
+    if (!query.trim()) return content;
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const parts = content.split(new RegExp(`(${escaped})`, "gi"));
+    return parts.map((part, i) =>
+      part.toLowerCase() === query.toLowerCase() ? (
+        <mark key={i} className="bg-[#FEF08A] text-black font-black px-0.5 rounded-none border border-black">
+          {part}
+        </mark>
+      ) : (
+        part
+      )
+    );
+  };
+
+  const handleInsertEmoji = (emoji: string) => {
+    setInputMessage((prev) => prev + emoji);
+    setEmojiPickerOpen(false);
+  };
+
+  const handleQuickAction = async (action: "dice" | "coin" | "invite") => {
+    if (action === "invite") {
+      handleOpenInviteModal();
+      return;
+    }
+    if (action === "dice") {
+      const roll = Math.floor(Math.random() * 6) + 1;
+      const text = `🎲 [ZAR ATILDI]: ${roll} geldi!`;
+      await handleSend(undefined, text);
+    } else if (action === "coin") {
+      const result = Math.random() < 0.5 ? "Yazı" : "Tura";
+      const text = `🪙 [YAZI-TURA]: Para fırlatıldı ve "${result}" geldi!`;
+      await handleSend(undefined, text);
+    }
+  };
+
+  const handleExportChat = () => {
+    if (!activeConversation || messages.length === 0) {
+      toast.add({
+        title: "Dışa Aktarılacak Mesaj Yok",
+        description: "Bu sohbette henüz indirilecek bir mesaj bulunmuyor.",
+        type: "info",
+      });
+      return;
+    }
+    const friendName = activeConversation.friend.display_name || activeConversation.friend.username;
+    const header = `=================================================\nLOBBY AI - DİREKT MESAJ GEÇMİŞİ\nSohbet: @${activeConversation.friend.username} (${friendName})\nTarih: ${new Date().toLocaleString("tr-TR")}\n=================================================\n\n`;
+    const body = messages.map((m) => {
+      const isMe = m.sender_id === user?.id;
+      const sender = isMe ? "Sen" : friendName;
+      const time = new Date(m.created_at).toLocaleString("tr-TR");
+      return `[${time}] ${sender}: ${m.content}`;
+    }).join("\n\n");
+
+    const blob = new Blob([header + body], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `sohbet-${activeConversation.friend.username}-${new Date().toISOString().slice(0, 10)}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    toast.add({
+      title: "Sohbet İndirildi",
+      description: "Mesaj geçmişiniz .txt dosyası olarak kaydedildi.",
+      type: "success",
+    });
   };
 
   const handleSend = async (e?: React.FormEvent, customText?: string) => {
@@ -284,16 +404,16 @@ function MessagesContent() {
       
       {/* Left Panel: Conversations & All Friends */}
       <div
-        className={`w-full md:w-80 lg:w-96 border-r-0 md:border-r-4 border-black flex flex-col bg-white shrink-0 ${
+        className={`w-full md:w-80 lg:w-96 border-r-0 md:border-r-4 border-black flex flex-col ${dmChatTheme.sidebarBodyClass} shrink-0 ${
           activeFriendId ? "hidden md:flex" : "flex"
         }`}
       >
         {/* Header with Navigation Tabs */}
-        <div className="bg-[#FEF08A] border-b-4 border-black shrink-0">
+        <div className={`${dmChatTheme.sidebarHeaderClass} shrink-0 transition-colors`}>
           <div className="p-3.5 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-black" />
-              <h2 className="font-black text-lg uppercase tracking-tight text-black">Direkt Mesajlar</h2>
+              <MessageSquare className="w-5 h-5 text-current" />
+              <h2 className="font-black text-lg uppercase tracking-tight text-current">Direkt Mesajlar</h2>
             </div>
             <span className="bg-black text-white font-black text-xs px-2.5 py-0.5 rounded-full border border-black shadow-[1px_1px_0_0_rgba(0,0,0,1)]">
               {visibleConversations.length}
@@ -378,10 +498,10 @@ function MessagesContent() {
                     }}
                     className={`p-3 flex items-center gap-3 cursor-pointer transition-all border-l-4 group relative ${
                       isSelected
-                        ? "bg-[#FFE4E6] border-black shadow-inner"
+                        ? dmChatTheme.sidebarActiveItemClass
                         : hasUnread
                         ? "bg-blue-50/50 hover:bg-gray-100 border-blue-500"
-                        : "hover:bg-gray-50 border-transparent"
+                        : `${dmChatTheme.sidebarItemHoverClass} border-transparent`
                     }`}
                   >
                     {/* Friend Avatar */}
@@ -404,11 +524,11 @@ function MessagesContent() {
                     {/* Info */}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-1 mb-0.5">
-                        <h4 className="font-black text-sm text-black truncate">
+                        <h4 className={`font-black text-sm truncate ${isSelected ? "text-inherit" : dmChatTheme.sidebarTextPrimary}`}>
                           {c.friend.display_name || c.friend.username}
                         </h4>
                         {c.last_message && (
-                          <span className="text-[10px] font-bold text-gray-400 shrink-0">
+                          <span className={`text-[10px] font-bold shrink-0 ${isSelected ? "opacity-75" : dmChatTheme.sidebarTextSecondary}`}>
                             {new Date(c.last_message.created_at).toLocaleTimeString([], {
                               hour: "2-digit",
                               minute: "2-digit",
@@ -417,7 +537,7 @@ function MessagesContent() {
                         )}
                       </div>
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-medium text-gray-600 truncate">
+                        <p className={`text-xs font-medium truncate ${isSelected ? "opacity-90" : dmChatTheme.sidebarTextSecondary}`}>
                           {c.last_message
                             ? `${c.last_message.sender_id === user?.id ? "Sen: " : ""}${c.last_message.content}`
                             : "Merhaba de! 👋"}
@@ -498,7 +618,7 @@ function MessagesContent() {
                   return (
                     <div
                       key={friend.id}
-                      className="p-3.5 flex items-center justify-between gap-3 hover:bg-gray-50 transition-colors"
+                      className={`p-3.5 flex items-center justify-between gap-3 ${dmChatTheme.sidebarItemHoverClass} transition-colors`}
                     >
                       <div 
                         className="flex items-center gap-3 min-w-0 cursor-pointer"
@@ -516,10 +636,10 @@ function MessagesContent() {
                           )}
                         </div>
                         <div className="min-w-0">
-                          <h4 className="font-black text-sm text-black truncate">
+                          <h4 className={`font-black text-sm truncate ${dmChatTheme.sidebarTextPrimary}`}>
                             {friend.display_name || friend.username}
                           </h4>
-                          <span className="text-xs font-bold text-gray-500 block truncate">
+                          <span className={`text-xs font-bold block truncate ${dmChatTheme.sidebarTextSecondary}`}>
                             @{friend.username}
                           </span>
                         </div>
@@ -556,7 +676,7 @@ function MessagesContent() {
             {/* Chat Column */}
             <div className="flex-1 flex flex-col min-w-0 min-h-0 h-full border-r-0 border-black">
               {/* Chat Header */}
-              <div className="bg-gradient-to-r from-[#FEF08A] via-[#FFEDD5] to-[#FCE7F3] border-b-4 border-black p-3 flex justify-between items-center z-10 shrink-0">
+              <div className={`${dmChatTheme.headerClass} p-3 flex justify-between items-center z-10 shrink-0 transition-colors`}>
                 <div className="flex items-center gap-3 min-w-0">
                   <Button
                     variant="outline"
@@ -587,7 +707,7 @@ function MessagesContent() {
                   
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-black text-base truncate text-black">
+                      <h3 className={`font-black text-base truncate ${dmChatTheme.headerTitleClass}`}>
                         {activeConversation.friend.display_name || activeConversation.friend.username}
                       </h3>
                       {activeConversation.friend.is_bot && (
@@ -596,7 +716,7 @@ function MessagesContent() {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs font-bold text-black/70 truncate flex items-center gap-1.5">
+                    <p className={`text-xs font-bold truncate flex items-center gap-1.5 ${dmChatTheme.headerSubtitleClass}`}>
                       <span>@{activeConversation.friend.username}</span>
                       <span className="inline-block w-2 h-2 rounded-full bg-[#4ADE80] border border-black" title="Çevrimiçi" />
                     </p>
@@ -614,6 +734,30 @@ function MessagesContent() {
                   >
                     <Share2 className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Lobiye Davet Et</span>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid="dm-quick-theme-button"
+                    onClick={() => setDmThemeModalOpen(true)}
+                    className="h-9 px-3 bg-[#FEF08A] hover:bg-[#FDE047] text-black border-2 border-black font-black text-xs shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:-translate-y-0.5 cursor-pointer flex items-center gap-1.5"
+                    title="DM Sohbet Temasını Değiştir"
+                  >
+                    <Palette className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Tema</span>
+                  </Button>
+
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportChat}
+                    className="h-9 px-2.5 bg-white hover:bg-gray-100 text-black border-2 border-black font-black text-xs shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:-translate-y-0.5 cursor-pointer hidden md:flex items-center gap-1"
+                    title="Sohbet Geçmişini .txt İndir"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span className="hidden lg:inline text-[11px]">İndir</span>
                   </Button>
 
                   <Button
@@ -692,7 +836,8 @@ function MessagesContent() {
               {/* Messages Area */}
               <div
                 ref={chatScrollRef}
-                className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 bg-[#f4f4f5] flex flex-col gap-3.5"
+                data-chat-theme={equippedDmTheme || "default"}
+                className={`flex-1 min-h-0 overflow-y-auto p-4 md:p-6 flex flex-col gap-3.5 transition-colors ${dmChatTheme.chatContainerClass}`}
               >
                 {isLoadingMessages ? (
                   <div className="flex-1 flex flex-col items-center justify-center gap-2 text-gray-500 font-bold">
@@ -714,10 +859,17 @@ function MessagesContent() {
                     )}
                   </div>
                 ) : (
-                  displayedMessages.map((msg) => {
+                  displayedMessages.map((msg, index) => {
                     const isMe = msg.sender_id === user?.id;
-                    const bubbleBg = isMe ? "bg-[#FEF9C3]" : "bg-white";
+                    const bubbleClass = isMe 
+                      ? `${dmChatTheme.myBubbleClass} my-bubble` 
+                      : `${dmChatTheme.partnerBubbleClass} partner-bubble`;
                     const alignmentClass = isMe ? "self-end" : "self-start";
+
+                    const showDateDivider = isDifferentDay(
+                      msg.created_at,
+                      index > 0 ? displayedMessages[index - 1].created_at : undefined
+                    );
 
                     // Check if message is a Lobby Invite card
                     const isLobbyInvite = msg.content.startsWith("🎮 [LOBİ DAVETİ]:");
@@ -725,18 +877,35 @@ function MessagesContent() {
                     const lobbyIdFromMsg = lobbyMatch ? lobbyMatch[1] : null;
 
                     return (
-                      <div
-                        key={msg.id}
-                        className={`flex flex-col max-w-[85%] md:max-w-[75%] ${alignmentClass} group relative`}
-                      >
+                      <div key={msg.id} className="contents">
+                        {showDateDivider && (
+                          <div className="flex items-center justify-center my-2.5 select-none">
+                            <span className="bg-[#FEF08A] text-black font-black text-[10px] uppercase tracking-wider px-3 py-0.5 border-2 border-black shadow-[2px_2px_0_0_#000]">
+                              📅 {formatDateDivider(msg.created_at)}
+                            </span>
+                          </div>
+                        )}
+                        <div
+                          className={`flex flex-col max-w-[85%] md:max-w-[75%] ${alignmentClass} group relative`}
+                        >
                         {/* Header info */}
                         <div className={`flex items-center gap-2 mb-1 ${isMe ? "justify-end" : ""}`}>
                           {!isMe && (
-                            <span className="font-black text-xs text-black">
+                            <span className={`font-black text-xs ${
+                              equippedDmTheme === "dm_theme_midnight_purple" 
+                                ? "text-[#C084FC]" 
+                                : equippedDmTheme === "dm_theme_emerald_secure" 
+                                ? "text-[#34D399]" 
+                                : "text-black"
+                            }`}>
                               {activeConversation.friend.display_name || activeConversation.friend.username}
                             </span>
                           )}
-                          <span className="text-[10px] text-gray-500 font-bold">
+                          <span className={`text-[10px] font-bold ${
+                            equippedDmTheme === "dm_theme_midnight_purple" || equippedDmTheme === "dm_theme_emerald_secure"
+                              ? "text-slate-400"
+                              : "text-gray-500"
+                          }`}>
                             {new Date(msg.created_at).toLocaleTimeString([], {
                               hour: "2-digit",
                               minute: "2-digit",
@@ -801,10 +970,10 @@ function MessagesContent() {
                               </div>
                             ) : (
                               <div
-                                className={`${bubbleBg} px-4 py-2.5 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] rounded-sm group-hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-shadow`}
+                                className={`${bubbleClass} px-4 py-2.5 rounded-sm group-hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-shadow`}
                               >
-                                <p className="whitespace-pre-wrap font-medium break-words text-sm leading-relaxed text-black/90">
-                                  {msg.content}
+                                <p className="whitespace-pre-wrap font-medium break-words text-sm leading-relaxed text-inherit">
+                                  {renderHighlightedText(msg.content, chatSearchQuery)}
                                 </p>
                               </div>
                             )}
@@ -850,6 +1019,7 @@ function MessagesContent() {
                             )}
                           </div>
                         )}
+                        </div>
                       </div>
                     );
                   })
@@ -873,9 +1043,9 @@ function MessagesContent() {
 
               {/* Conversation Starters (Quick Prompts) */}
               {messages.length === 0 && (
-                <div className="bg-[#FEF08A]/40 border-t-2 border-black p-3 flex flex-wrap gap-2 items-center">
-                  <span className="text-xs font-black uppercase text-black flex items-center gap-1 mr-1">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-600" /> Hızlı Başla:
+                <div className={`${dmChatTheme.quickPromptsClass} p-3 flex flex-wrap gap-2 items-center transition-colors`}>
+                  <span className="text-xs font-black uppercase flex items-center gap-1 mr-1 text-inherit">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Hızlı Başla:
                   </span>
                   {CONVERSATION_STARTERS.map((prompt) => (
                     <button
@@ -890,8 +1060,93 @@ function MessagesContent() {
                 </div>
               )}
 
-              {/* Input Form */}
-              <div className="bg-[#FEF08A] border-t-4 border-black p-4 shrink-0">
+              {/* Input Form & Action Bar */}
+              <div className={`${dmChatTheme.inputBarClass} p-3 sm:p-4 shrink-0 relative transition-colors`}>
+                {/* Popover Emoji Picker */}
+                {emojiPickerOpen && (
+                  <div className="mb-3 p-3 bg-white border-3 border-black shadow-[4px_4px_0_0_#000] rounded-none animate-slide-down">
+                    <div className="flex items-center justify-between border-b-2 border-black pb-1.5 mb-2">
+                      <span className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-1.5">
+                        <Smile className="w-3.5 h-3.5 text-amber-500" /> Hızlı Emojiler
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setEmojiPickerOpen(false)}
+                        className="p-1 hover:bg-gray-100 border border-black cursor-pointer text-xs font-black"
+                      >
+                        <X className="w-3.5 h-3.5 text-black" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {Object.entries(EMOJI_CATEGORIES).map(([category, emojis]) => (
+                        <div key={category}>
+                          <span className="text-[10px] font-black uppercase text-gray-500 block mb-1">
+                            {category}
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {emojis.map((emoji) => (
+                              <button
+                                key={emoji}
+                                type="button"
+                                onClick={() => handleInsertEmoji(emoji)}
+                                className="w-8 h-8 flex items-center justify-center text-base hover:scale-125 hover:bg-[#FEF08A] border border-black/20 hover:border-black rounded-none transition-all cursor-pointer"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Quick Action Toolbar */}
+                <div className="flex items-center gap-1.5 mb-2.5 overflow-x-auto no-scrollbar">
+                  <button
+                    type="button"
+                    onClick={() => setEmojiPickerOpen(!emojiPickerOpen)}
+                    className={`px-2.5 py-1 text-xs font-black uppercase flex items-center gap-1 border-2 border-black transition-all cursor-pointer shadow-[2px_2px_0_0_#000] hover:-translate-y-0.5 active:translate-y-0 ${
+                      emojiPickerOpen ? "bg-black text-white" : "bg-white text-black hover:bg-[#FEF08A]"
+                    }`}
+                    title="Emoji Menüsünü Aç"
+                  >
+                    <Smile className="w-3.5 h-3.5" />
+                    <span>Emoji</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickAction("dice")}
+                    className="px-2.5 py-1 text-xs font-black uppercase flex items-center gap-1 bg-white hover:bg-[#FEF08A] text-black border-2 border-black transition-all cursor-pointer shadow-[2px_2px_0_0_#000] hover:-translate-y-0.5 active:translate-y-0"
+                    title="Zar At (1-6)"
+                  >
+                    <Dices className="w-3.5 h-3.5 text-purple-700" />
+                    <span>Zar At</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickAction("coin")}
+                    className="px-2.5 py-1 text-xs font-black uppercase flex items-center gap-1 bg-white hover:bg-[#FEF08A] text-black border-2 border-black transition-all cursor-pointer shadow-[2px_2px_0_0_#000] hover:-translate-y-0.5 active:translate-y-0"
+                    title="Yazı-Tura Fırlat"
+                  >
+                    <span>🪙</span>
+                    <span>Yazı-Tura</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickAction("invite")}
+                    className="px-2.5 py-1 text-xs font-black uppercase flex items-center gap-1 bg-white hover:bg-[#4ADE80] text-black border-2 border-black transition-all cursor-pointer shadow-[2px_2px_0_0_#000] hover:-translate-y-0.5 active:translate-y-0"
+                    title="Lobiye Davet Gönder"
+                  >
+                    <DoorOpen className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Lobiye Davet</span>
+                  </button>
+                </div>
+
                 <form onSubmit={handleSend} className="flex items-center gap-2.5" autoComplete="off">
                   <Input
                     value={inputMessage}
@@ -950,6 +1205,15 @@ function MessagesContent() {
                     <span className="w-2 h-2 rounded-full bg-[#4ADE80] border border-black" />
                     <span>Lobi AI Üyesi</span>
                   </div>
+
+                  {activeConversation.friend.bio && (
+                    <div className="mt-3 p-2.5 bg-[#FEF08A] border-2 border-black shadow-[2px_2px_0_0_#000] text-left w-full">
+                      <span className="text-[9px] font-black uppercase text-black/60 block mb-0.5">Hakkında</span>
+                      <p className="text-xs font-bold text-black leading-snug">
+                        💬 {activeConversation.friend.bio}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Quick Actions in Drawer */}
@@ -966,6 +1230,17 @@ function MessagesContent() {
                   >
                     <span className="flex items-center gap-2">
                       <UserIcon className="w-3.5 h-3.5 text-[#FB923C]" /> Tam Profili Aç
+                    </span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleExportChat}
+                    className="w-full py-2 px-3 bg-white hover:bg-gray-100 text-black border-2 border-black font-black text-xs uppercase shadow-[2px_2px_0_0_rgba(0,0,0,1)] hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-between cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Download className="w-3.5 h-3.5 text-[#06B6D4]" /> Sohbeti İndir (.txt)
                     </span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
@@ -1090,6 +1365,91 @@ function MessagesContent() {
                 </div>
               ))
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* DM Theme Picker Dialog */}
+      <Dialog open={dmThemeModalOpen} onOpenChange={setDmThemeModalOpen}>
+        <DialogContent className="max-w-md bg-white brutal-border border-3 shadow-[6px_6px_0_0_#000] rounded-sm p-5 text-black">
+          <DialogHeader className="border-b-2 border-black pb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xs bg-[#FEF08A] border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0_0_#000]">
+                <Palette className="w-4 h-4 text-black" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-black uppercase text-black tracking-tight">
+                  DM Sohbet Teması Seç
+                </DialogTitle>
+                <DialogDescription className="text-xs font-bold text-gray-600">
+                  Özel mesaj pencerelerinde anında uygulanacak temanızı belirleyin:
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="mt-3 space-y-2.5 max-h-80 overflow-y-auto pr-1">
+            {[
+              {
+                id: null,
+                name: "Standart Neo-Brutalist",
+                desc: "Klasik sarı & beyaz retro neo-brutalist stil",
+                previewClass: "bg-[#FEF9C3] text-black border-2 border-black",
+                badge: "Varsayılan",
+              },
+              {
+                id: "dm_theme_midnight_purple",
+                name: "Gece Moru & Eflatun",
+                desc: "Koyu mor zemin ve neon eflatun hatlar",
+                previewClass: "bg-[#2E1065] text-[#E9D5FF] border-2 border-[#A855F7]",
+                badge: "Popüler",
+              },
+              {
+                id: "dm_theme_emerald_secure",
+                name: "Şifreli Zümrüt Yeşili",
+                desc: "Uçtan uca şifreli hissi veren koyu zümrüt siber tonları",
+                previewClass: "bg-[#064E3B] text-[#A7F3D0] border-2 border-[#10B981]",
+                badge: "Siber",
+              },
+              {
+                id: "dm_theme_sunset_vibes",
+                name: "Günbatımı Şöleni",
+                desc: "Canlı pembe ve turuncu günbatımı degradeleri",
+                previewClass: "bg-gradient-to-r from-[#F472B6] to-[#FB923C] text-white border-2 border-black",
+                badge: "Canlı",
+              },
+            ].map((th) => {
+              const isSelected = (equippedDmTheme || null) === th.id;
+              return (
+                <div
+                  key={String(th.id)}
+                  onClick={() => handleSwitchDmTheme(th.id)}
+                  className={`p-3 border-2 border-black rounded-xs cursor-pointer transition-all ${
+                    isSelected
+                      ? "bg-white shadow-[3px_3px_0_0_#000] -translate-y-0.5 ring-2 ring-[#0891B2]"
+                      : "bg-gray-50 hover:bg-white shadow-[1px_1px_0_0_#000]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-black text-xs text-black">{th.name}</span>
+                      <span className="text-[9px] font-black uppercase px-1.5 py-0.2 bg-[#FEF08A] text-black border border-black">
+                        {th.badge}
+                      </span>
+                    </div>
+                    {isSelected && (
+                      <span className="w-5 h-5 rounded-full bg-[#4ADE80] border border-black flex items-center justify-center text-xs font-black text-black">
+                        ✓
+                      </span>
+                    )}
+                  </div>
+                  <div className={`p-2 rounded-xs text-[11px] font-bold mb-1 ${th.previewClass}`}>
+                    "Merhaba! Yeni DM temam harika görünüyor ✨"
+                  </div>
+                  <p className="text-[10px] font-medium text-gray-500">{th.desc}</p>
+                </div>
+              );
+            })}
           </div>
         </DialogContent>
       </Dialog>

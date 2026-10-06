@@ -1,0 +1,1167 @@
+{
+  "dashboard": [
+    {
+      "tag": "BUTTON",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 "
+    },
+    {
+      "tag": "SPAN",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "hidden xs:inline sm:inline"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "PROFİL",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(46, 16, 101)",
+      "className": "group/button inline-flex items-center justify-cent"
+    },
+    {
+      "tag": "SPAN",
+      "text": "🪙",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": ""
+    },
+    {
+      "tag": "SPAN",
+      "text": "100 LOBBY COİN",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": ""
+    },
+    {
+      "tag": "BUTTON",
+      "text": "LOBİLERE GÖZ AT",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(6, 182, 212)",
+      "className": "group/button inline-flex items-center justify-cent"
+    },
+    {
+      "tag": "DIV",
+      "text": "A",
+      "textColor": "rgb(255, 255, 255)",
+      "bgColor": "rgb(251, 146, 60)",
+      "className": "w-7 h-7 rounded-full bg-[#FB923C] border border-bl"
+    },
+    {
+      "tag": "SPAN",
+      "text": "02 // LOBİ İÇİ DÜELLOLAR",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(251, 146, 60)",
+      "className": "px-2.5 py-1 text-[11px] font-black uppercase borde"
+    },
+    {
+      "tag": "SPAN",
+      "text": "DÜELLO TAMAMLANDI",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(74, 222, 128)",
+      "className": "text-[10px] font-black uppercase bg-[#4ADE80] text"
+    },
+    {
+      "tag": "SPAN",
+      "text": "AKTİF AJAN",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(74, 222, 128)",
+      "className": "text-[10px] font-black uppercase bg-[#4ADE80] text"
+    },
+    {
+      "tag": "DIV",
+      "text": "🤖",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(196, 181, 253)",
+      "className": "w-8 h-8 rounded-full bg-[#C4B5FD] border border-bl"
+    },
+    {
+      "tag": "SPAN",
+      "text": "04 // TOPLULUK & GÖREVLER",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(74, 222, 128)",
+      "className": "px-2.5 py-1 text-[11px] font-black uppercase borde"
+    },
+    {
+      "tag": "DIV",
+      "text": "GÜNÜN ANKETİ\n180+ OY",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(240, 253, 244)",
+      "className": "flex items-center justify-between border-b-2 borde"
+    },
+    {
+      "tag": "SPAN",
+      "text": "GÜNÜN ANKETİ",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(240, 253, 244)",
+      "className": "font-black text-xs uppercase text-black flex items"
+    },
+    {
+      "tag": "DIV",
+      "text": "🤖 AI Oyun Moderatörlüğü\n42%\n\ud83d",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(240, 253, 244)",
+      "className": "space-y-1.5 py-1"
+    },
+    {
+      "tag": "DIV",
+      "text": "💬 Sürekli Canlı Sohbet\n58%",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(240, 253, 244)",
+      "className": "p-1.5 bg-[#4ADE80]/40 border border-black rounded-"
+    },
+    {
+      "tag": "SPAN",
+      "text": "💬 Sürekli Canlı Sohbet",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(240, 253, 244)",
+      "className": ""
+    },
+    {
+      "tag": "SPAN",
+      "text": "58%",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(240, 253, 244)",
+      "className": "font-mono font-black"
+    },
+    {
+      "tag": "SPAN",
+      "text": "05 // MAĞAZA & ROZETLER",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(167, 139, 250)",
+      "className": "px-2.5 py-1 text-[11px] font-black uppercase borde"
+    },
+    {
+      "tag": "DIV",
+      "text": "KİMLİK & MAĞAZA\n🪙 350 LC BAKİ",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(250, 245, 255)",
+      "className": "flex items-center justify-between border-b-2 borde"
+    },
+    {
+      "tag": "SPAN",
+      "text": "KİMLİK & MAĞAZA",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(250, 245, 255)",
+      "className": "font-black text-xs uppercase text-black flex items"
+    },
+    {
+      "tag": "DIV",
+      "text": "🐱\n\n@GezginKedi\n\nDURUM: 🚀 KOD",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(250, 245, 255)",
+      "className": "flex items-center gap-3 py-1"
+    },
+    {
+      "tag": "DIV",
+      "text": "@GezginKedi\n\nDURUM: 🚀 KOD YAZ",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(250, 245, 255)",
+      "className": ""
+    },
+    {
+      "tag": "P",
+      "text": "@GezginKedi",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(250, 245, 255)",
+      "className": "font-black text-xs text-black"
+    },
+    {
+      "tag": "P",
+      "text": "DURUM: 🚀 KOD YAZIYOR",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(74, 222, 128)",
+      "className": "text-[10px] font-black uppercase bg-[#4ADE80] px-1"
+    },
+    {
+      "tag": "DIV",
+      "text": "⚔️ DÜELLO USTASI\n👑 LOBİ LİDER",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(250, 245, 255)",
+      "className": "flex gap-1.5 pt-2 border-t border-black/20 text-[9"
+    },
+    {
+      "tag": "SPAN",
+      "text": "⚔️ DÜELLO USTASI",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(251, 146, 60)",
+      "className": "px-2 py-0.5 bg-[#FB923C] border border-black"
+    },
+    {
+      "tag": "SPAN",
+      "text": "Kullanıcı",
+      "textColor": "rgb(234, 88, 12)",
+      "bgColor": "rgb(11, 17, 32)",
+      "className": "font-black text-[#EA580C] flex items-center gap-1"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "PROFİLİ GÖRÜNTÜLE",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "group/button inline-flex shrink-0 items-center jus"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "BİR TANE OLUŞTUR",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(6, 182, 212)",
+      "className": "group/button inline-flex shrink-0 items-center jus"
+    }
+  ],
+  "lobbies": [
+    {
+      "tag": "BUTTON",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 "
+    },
+    {
+      "tag": "SPAN",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "hidden xs:inline sm:inline"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "PROFİL",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(46, 16, 101)",
+      "className": "group/button inline-flex items-center justify-cent"
+    },
+    {
+      "tag": "DIV",
+      "text": "🎨 Tasarım & Neo-Brutalism",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "group-data-[size=sm]/card:text-sm text-xl font-bla"
+    }
+  ],
+  "community": [
+    {
+      "tag": "BUTTON",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 "
+    },
+    {
+      "tag": "SPAN",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "hidden xs:inline sm:inline"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "PROFİL",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(46, 16, 101)",
+      "className": "group/button inline-flex items-center justify-cent"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "💬 SOHBET & TANIŞMA",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "\n                      flex items-center gap-1.5 p"
+    },
+    {
+      "tag": "SPAN",
+      "text": "💬 SOHBET & TANIŞMA",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": ""
+    },
+    {
+      "tag": "BUTTON",
+      "text": "⚔️ DÜELLO & OYUN",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "\n                      flex items-center gap-1.5 p"
+    },
+    {
+      "tag": "SPAN",
+      "text": "⚔️ DÜELLO & OYUN",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": ""
+    },
+    {
+      "tag": "BUTTON",
+      "text": "🤖 YAPAY ZEKA",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "\n                      flex items-center gap-1.5 p"
+    },
+    {
+      "tag": "SPAN",
+      "text": "🤖 YAPAY ZEKA",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": ""
+    },
+    {
+      "tag": "BUTTON",
+      "text": "☕ SAKİN & CHİLL",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "\n                      flex items-center gap-1.5 p"
+    },
+    {
+      "tag": "SPAN",
+      "text": "☕ SAKİN & CHİLL",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": ""
+    },
+    {
+      "tag": "DIV",
+      "text": "HEMEN IŞINLAN\nYENİ ODA AÇ",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "space-y-2 pt-2"
+    },
+    {
+      "tag": "A",
+      "text": "YENİ ODA AÇ",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "block"
+    },
+    {
+      "tag": "P",
+      "text": "\"İnternette en çok vakit geçir",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(11, 17, 32)",
+      "className": "font-black text-base sm:text-lg text-black"
+    },
+    {
+      "tag": "SPAN",
+      "text": "GELİŞTİRME GÜNLÜĞÜ • YAPAY ZEK",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(224, 242, 254)",
+      "className": "px-2 py-0.5 text-[9px] font-black uppercase border"
+    },
+    {
+      "tag": "SPAN",
+      "text": "DUYURU • MAĞAZA & EKONOMİ",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(252, 231, 243)",
+      "className": "px-2 py-0.5 text-[9px] font-black uppercase border"
+    },
+    {
+      "tag": "SPAN",
+      "text": "TOPLULUK • İÇERİK",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(220, 252, 231)",
+      "className": "px-2 py-0.5 text-[9px] font-black uppercase border"
+    },
+    {
+      "tag": "SPAN",
+      "text": "ETKİNLİK • TURNUVA",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 226, 226)",
+      "className": "px-2 py-0.5 text-[9px] font-black uppercase border"
+    },
+    {
+      "tag": "SPAN",
+      "text": "GELİŞTİRME GÜNLÜĞÜ • TEKNOLOJİ",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(237, 233, 254)",
+      "className": "px-2 py-0.5 text-[9px] font-black uppercase border"
+    },
+    {
+      "tag": "SPAN",
+      "text": "GENEL LOBİ",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(251, 146, 60)",
+      "className": "px-2 py-0.5 text-[10px] font-black uppercase borde"
+    },
+    {
+      "tag": "SPAN",
+      "text": "GENEL LOBİ",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(74, 222, 128)",
+      "className": "px-2 py-0.5 text-[10px] font-black uppercase borde"
+    },
+    {
+      "tag": "SPAN",
+      "text": "GENEL LOBİ",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(251, 146, 60)",
+      "className": "px-2 py-0.5 text-[10px] font-black uppercase borde"
+    }
+  ],
+  "messages": [
+    {
+      "tag": "BUTTON",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 "
+    },
+    {
+      "tag": "SPAN",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "hidden xs:inline sm:inline"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "PROFİL",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(46, 16, 101)",
+      "className": "group/button inline-flex items-center justify-cent"
+    }
+  ],
+  "shop": [
+    {
+      "tag": "BUTTON",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 "
+    },
+    {
+      "tag": "SPAN",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "hidden xs:inline sm:inline"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "PROFİL",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(46, 16, 101)",
+      "className": "group/button inline-flex items-center justify-cent"
+    },
+    {
+      "tag": "DIV",
+      "text": "Önizleme",
+      "textColor": "rgb(34, 197, 94)",
+      "bgColor": "rgb(5, 21, 9)",
+      "className": "px-4 py-1.5 text-xs font-black bg-[#051509] text-["
+    }
+  ],
+  "profile": [
+    {
+      "tag": "BUTTON",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 "
+    },
+    {
+      "tag": "SPAN",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "hidden xs:inline sm:inline"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "PROFİL",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(46, 16, 101)",
+      "className": "group/button inline-flex items-center justify-cent"
+    },
+    {
+      "tag": "DIV",
+      "text": "YÜKLE",
+      "textColor": "rgb(255, 255, 255)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "absolute inset-0 bg-black/60 opacity-0 group-hover"
+    },
+    {
+      "tag": "SPAN",
+      "text": "YÜKLE",
+      "textColor": "rgb(255, 255, 255)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "text-[10px] font-black uppercase tracking-tight te"
+    },
+    {
+      "tag": "SPAN",
+      "text": "DÜELLO USTASI",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(251, 146, 60)",
+      "className": ""
+    },
+    {
+      "tag": "BUTTON",
+      "text": "#1",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "group relative flex flex-col items-center gap-1 p-"
+    },
+    {
+      "tag": "SPAN",
+      "text": "#1",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "text-[8px] font-mono font-black uppercase truncate"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "#2",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "group relative flex flex-col items-center gap-1 p-"
+    },
+    {
+      "tag": "SPAN",
+      "text": "#2",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "text-[8px] font-mono font-black uppercase truncate"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "#3",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "group relative flex flex-col items-center gap-1 p-"
+    },
+    {
+      "tag": "SPAN",
+      "text": "#3",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "text-[8px] font-mono font-black uppercase truncate"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "#4",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "group relative flex flex-col items-center gap-1 p-"
+    },
+    {
+      "tag": "SPAN",
+      "text": "#4",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "text-[8px] font-mono font-black uppercase truncate"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "#5",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "group relative flex flex-col items-center gap-1 p-"
+    },
+    {
+      "tag": "SPAN",
+      "text": "#5",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "text-[8px] font-mono font-black uppercase truncate"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "#6",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "group relative flex flex-col items-center gap-1 p-"
+    },
+    {
+      "tag": "SPAN",
+      "text": "#6",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "text-[8px] font-mono font-black uppercase truncate"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "#7",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "group relative flex flex-col items-center gap-1 p-"
+    },
+    {
+      "tag": "SPAN",
+      "text": "#7",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "text-[8px] font-mono font-black uppercase truncate"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "DEĞİŞİKLİKLERİ KAYDET",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(96, 165, 250)",
+      "className": "group/button inline-flex shrink-0 items-center jus"
+    },
+    {
+      "tag": "SPAN",
+      "text": "EFSANEVİ",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(251, 146, 60)",
+      "className": "px-2 py-0.5 text-[9px] font-black uppercase border"
+    },
+    {
+      "tag": "SPAN",
+      "text": "ÖNE ÇIKAN",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(251, 146, 60)",
+      "className": "px-1.5 py-0.5 text-[9px] font-black uppercase bg-["
+    },
+    {
+      "tag": "SPAN",
+      "text": "NADİR",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(252, 165, 165)",
+      "className": "px-2 py-0.5 text-[9px] font-black uppercase border"
+    },
+    {
+      "tag": "SPAN",
+      "text": "STANDART",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(74, 222, 128)",
+      "className": "px-2 py-0.5 text-[9px] font-black uppercase border"
+    },
+    {
+      "tag": "SPAN",
+      "text": "USTA",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(103, 232, 249)",
+      "className": "px-2 py-0.5 text-[9px] font-black uppercase border"
+    },
+    {
+      "tag": "SPAN",
+      "text": "EFSANEVİ",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(196, 181, 253)",
+      "className": "px-2 py-0.5 text-[9px] font-black uppercase border"
+    },
+    {
+      "tag": "SPAN",
+      "text": "NADİR",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(253, 224, 71)",
+      "className": "px-2 py-0.5 text-[9px] font-black uppercase border"
+    }
+  ],
+  "agents": [
+    {
+      "tag": "BUTTON",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 "
+    },
+    {
+      "tag": "SPAN",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "hidden xs:inline sm:inline"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "PROFİL",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(46, 16, 101)",
+      "className": "group/button inline-flex items-center justify-cent"
+    },
+    {
+      "tag": "H1",
+      "text": "YAPAY ZEKA AJAN MERKEZİ",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(7, 11, 20)",
+      "className": "text-3xl sm:text-5xl font-black uppercase tracking"
+    }
+  ],
+  "agents_builder": [
+    {
+      "tag": "BUTTON",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 "
+    },
+    {
+      "tag": "SPAN",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "hidden xs:inline sm:inline"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "PROFİL",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(46, 16, 101)",
+      "className": "group/button inline-flex items-center justify-cent"
+    },
+    {
+      "tag": "DIV",
+      "text": "YÜKLE",
+      "textColor": "rgb(255, 255, 255)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "absolute inset-0 bg-black/60 opacity-0 group-hover"
+    },
+    {
+      "tag": "SPAN",
+      "text": "YÜKLE",
+      "textColor": "rgb(255, 255, 255)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "text-[10px] font-black uppercase tracking-tight te"
+    },
+    {
+      "tag": "DIV",
+      "text": "HERKES\n\nTüm lobi üyeleri",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": ""
+    },
+    {
+      "tag": "H2",
+      "text": "TARZ VE DAVRANIŞ",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(244, 114, 182)",
+      "className": "text-2xl font-black uppercase border-b-4 border-bl"
+    }
+  ],
+  "modal_quests": [
+    {
+      "tag": "BUTTON",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 "
+    },
+    {
+      "tag": "SPAN",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "hidden xs:inline sm:inline"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "PROFİL",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(46, 16, 101)",
+      "className": "group/button inline-flex items-center justify-cent"
+    },
+    {
+      "tag": "DIV",
+      "text": "YÜKLE",
+      "textColor": "rgb(255, 255, 255)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "absolute inset-0 bg-black/60 opacity-0 group-hover"
+    },
+    {
+      "tag": "SPAN",
+      "text": "YÜKLE",
+      "textColor": "rgb(255, 255, 255)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "text-[10px] font-black uppercase tracking-tight te"
+    },
+    {
+      "tag": "DIV",
+      "text": "HERKES\n\nTüm lobi üyeleri",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": ""
+    },
+    {
+      "tag": "H2",
+      "text": "TARZ VE DAVRANIŞ",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(244, 114, 182)",
+      "className": "text-2xl font-black uppercase border-b-4 border-bl"
+    },
+    {
+      "tag": "DIV",
+      "text": "🪙\nCÜZDANIM\n100",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "flex items-center gap-2 self-start sm:self-center "
+    },
+    {
+      "tag": "SPAN",
+      "text": "0/6",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "px-1.5 py-0.2 text-[10px] font-mono border bg-[#FE"
+    },
+    {
+      "tag": "SPAN",
+      "text": "HAFTALIK GÖREVLER",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": ""
+    },
+    {
+      "tag": "SPAN",
+      "text": "0/5",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(30, 27, 75)",
+      "className": "px-1.5 py-0.2 text-[10px] font-mono border bg-blac"
+    },
+    {
+      "tag": "SPAN",
+      "text": "+40",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "font-black text-xs text-black"
+    },
+    {
+      "tag": "SPAN",
+      "text": "+30",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "font-black text-xs text-black"
+    },
+    {
+      "tag": "SPAN",
+      "text": "+35",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "font-black text-xs text-black"
+    },
+    {
+      "tag": "SPAN",
+      "text": "+50",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "font-black text-xs text-black"
+    },
+    {
+      "tag": "SPAN",
+      "text": "+45",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "font-black text-xs text-black"
+    },
+    {
+      "tag": "SPAN",
+      "text": "+35",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "font-black text-xs text-black"
+    }
+  ],
+  "modal_profile_card": [
+    {
+      "tag": "BUTTON",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 "
+    },
+    {
+      "tag": "SPAN",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "hidden xs:inline sm:inline"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "PROFİL",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(46, 16, 101)",
+      "className": "group/button inline-flex items-center justify-cent"
+    },
+    {
+      "tag": "DIV",
+      "text": "YÜKLE",
+      "textColor": "rgb(255, 255, 255)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "absolute inset-0 bg-black/60 opacity-0 group-hover"
+    },
+    {
+      "tag": "SPAN",
+      "text": "YÜKLE",
+      "textColor": "rgb(255, 255, 255)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "text-[10px] font-black uppercase tracking-tight te"
+    },
+    {
+      "tag": "SPAN",
+      "text": "DÜELLO USTASI",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(251, 146, 60)",
+      "className": ""
+    },
+    {
+      "tag": "BUTTON",
+      "text": "#1",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "group relative flex flex-col items-center gap-1 p-"
+    },
+    {
+      "tag": "SPAN",
+      "text": "#1",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "text-[8px] font-mono font-black uppercase truncate"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "#2",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "group relative flex flex-col items-center gap-1 p-"
+    },
+    {
+      "tag": "SPAN",
+      "text": "#2",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "text-[8px] font-mono font-black uppercase truncate"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "#3",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "group relative flex flex-col items-center gap-1 p-"
+    },
+    {
+      "tag": "SPAN",
+      "text": "#3",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "text-[8px] font-mono font-black uppercase truncate"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "#4",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "group relative flex flex-col items-center gap-1 p-"
+    },
+    {
+      "tag": "SPAN",
+      "text": "#4",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "text-[8px] font-mono font-black uppercase truncate"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "#5",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "group relative flex flex-col items-center gap-1 p-"
+    },
+    {
+      "tag": "SPAN",
+      "text": "#5",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "text-[8px] font-mono font-black uppercase truncate"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "#6",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "group relative flex flex-col items-center gap-1 p-"
+    },
+    {
+      "tag": "SPAN",
+      "text": "#6",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "text-[8px] font-mono font-black uppercase truncate"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "#7",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "group relative flex flex-col items-center gap-1 p-"
+    },
+    {
+      "tag": "SPAN",
+      "text": "#7",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "text-[8px] font-mono font-black uppercase truncate"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "DEĞİŞİKLİKLERİ KAYDET",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(96, 165, 250)",
+      "className": "group/button inline-flex shrink-0 items-center jus"
+    },
+    {
+      "tag": "SPAN",
+      "text": "EFSANEVİ",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(251, 146, 60)",
+      "className": "px-2 py-0.5 text-[9px] font-black uppercase border"
+    },
+    {
+      "tag": "SPAN",
+      "text": "ÖNE ÇIKAN",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(251, 146, 60)",
+      "className": "px-1.5 py-0.5 text-[9px] font-black uppercase bg-["
+    },
+    {
+      "tag": "SPAN",
+      "text": "NADİR",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(252, 165, 165)",
+      "className": "px-2 py-0.5 text-[9px] font-black uppercase border"
+    },
+    {
+      "tag": "SPAN",
+      "text": "STANDART",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(74, 222, 128)",
+      "className": "px-2 py-0.5 text-[9px] font-black uppercase border"
+    },
+    {
+      "tag": "SPAN",
+      "text": "USTA",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(103, 232, 249)",
+      "className": "px-2 py-0.5 text-[9px] font-black uppercase border"
+    },
+    {
+      "tag": "SPAN",
+      "text": "EFSANEVİ",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(196, 181, 253)",
+      "className": "px-2 py-0.5 text-[9px] font-black uppercase border"
+    },
+    {
+      "tag": "SPAN",
+      "text": "NADİR",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(253, 224, 71)",
+      "className": "px-2 py-0.5 text-[9px] font-black uppercase border"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "GÖRÜNÜMÜ ÖZELLEŞTİR",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(6, 182, 212)",
+      "className": "group/button brutal-border brutal-shadow bg-clip-p"
+    }
+  ],
+  "modal_create_lobby": [
+    {
+      "tag": "BUTTON",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 "
+    },
+    {
+      "tag": "SPAN",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "hidden xs:inline sm:inline"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "PROFİL",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(46, 16, 101)",
+      "className": "group/button inline-flex items-center justify-cent"
+    },
+    {
+      "tag": "DIV",
+      "text": "🎨 Tasarım & Neo-Brutalism",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "group-data-[size=sm]/card:text-sm text-xl font-bla"
+    }
+  ],
+  "lobby_room": [
+    {
+      "tag": "BUTTON",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 "
+    },
+    {
+      "tag": "SPAN",
+      "text": "Görevler",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(16, 185, 129)",
+      "className": "hidden xs:inline sm:inline"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "PROFİL",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(46, 16, 101)",
+      "className": "group/button inline-flex items-center justify-cent"
+    },
+    {
+      "tag": "H1",
+      "text": "Canlı Test Odası",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(11, 17, 32)",
+      "className": "text-2xl font-black tracking-tight text-black"
+    },
+    {
+      "tag": "P",
+      "text": "Açıklama bulunmuyor",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(11, 17, 32)",
+      "className": "text-sm font-bold text-black/75"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "Parti Oyunları",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(6, 182, 212)",
+      "className": "group/button inline-flex shrink-0 items-center jus"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "Ayarlar",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(15, 23, 42)",
+      "className": "group/button inline-flex shrink-0 items-center jus"
+    },
+    {
+      "tag": "DIV",
+      "text": "🎲 /zar\n🪙 /yazitura\n💣 /bomba",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "bg-[#FEF08A] border-t-4 border-black p-4 shrink-0 "
+    },
+    {
+      "tag": "DIV",
+      "text": "AKTİVİTELER",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "relative"
+    },
+    {
+      "tag": "BUTTON",
+      "text": "GÖNDER",
+      "textColor": "rgb(0, 0, 0)",
+      "bgColor": "rgb(6, 182, 212)",
+      "className": "group/button inline-flex shrink-0 items-center jus"
+    },
+    {
+      "tag": "DIV",
+      "text": "ÜYELER — 8",
+      "textColor": "rgb(248, 250, 252)",
+      "bgColor": "rgb(254, 240, 138)",
+      "className": "p-4 border-b-4 border-black bg-[#FEF08A] shrink-0"
+    }
+  ]
+}
